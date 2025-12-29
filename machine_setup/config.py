@@ -1,0 +1,99 @@
+"""Profile definitions and package tiers."""
+
+from dataclasses import dataclass
+from enum import Enum
+from typing import Final
+
+
+class Profile(str, Enum):
+    MINIMAL = "minimal"  # Containers: essential CLI only
+    DEV = "dev"  # VMs: development tools, no GUI
+    FULL = "full"  # Workstations: everything + GUI
+
+
+PACKAGES_MINIMAL: Final[list[str]] = [
+    "git",
+    "vim",
+    "zsh",
+    "tmux",
+    "curl",
+    "wget",
+    "ripgrep",
+    "fzf",
+    "bat",
+    "btop",
+    "gh",
+    "jq",
+    "tree",
+    "stow",
+    "ca-certificates",
+]
+
+PACKAGES_DEV: Final[list[str]] = [
+    "gcc",
+    "g++",
+    "make",
+    "golang",
+    "python3",
+    "python-is-python3",
+    "python3-venv",
+    "python3-pip",
+    "podman",
+    "git-delta",
+    "shellcheck",
+    "shfmt",
+    "entr",
+    "parallel",
+    "gdb",
+    "ssh",
+]
+
+PACKAGES_FULL: Final[list[str]] = [
+    "texlive",
+    "tex-common",
+    "latexmk",
+    "pandoc",
+    "zathura",
+    "xclip",
+    "clang",
+    "clang-format",
+]
+
+STOW_PACKAGES: Final[dict[Profile, list[str]]] = {
+    Profile.MINIMAL: ["shell", "git"],
+    Profile.DEV: ["shell", "git", "vim", "tmux", "scripts", "config", "ai-tools"],
+    Profile.FULL: [
+        "shell",
+        "git",
+        "vim",
+        "tmux",
+        "scripts",
+        "config",
+        "ai-tools",
+        "gui",
+    ],
+}
+
+
+@dataclass(frozen=True)
+class SetupConfig:
+    """Configuration for the setup process."""
+
+    profile: Profile
+    dotfiles_repo: str = "git@github.com:sderev/.dotfiles_private.git"
+    dotfiles_dir: str = "~/.dotfiles_private"
+    home_dir: str = "~"
+    skip_secrets: bool = False
+
+    def get_packages(self) -> list[str]:
+        """Return packages for current profile (cumulative)."""
+        packages = list(PACKAGES_MINIMAL)
+        if self.profile in (Profile.DEV, Profile.FULL):
+            packages.extend(PACKAGES_DEV)
+        if self.profile == Profile.FULL:
+            packages.extend(PACKAGES_FULL)
+        return packages
+
+    def get_stow_packages(self) -> list[str]:
+        """Return stow packages for current profile."""
+        return STOW_PACKAGES[self.profile]
