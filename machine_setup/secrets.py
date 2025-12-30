@@ -39,11 +39,12 @@ def setup_ssh_key(key_name: str = "id_ed25519") -> bool:
     """Retrieve and setup SSH key from Proton Pass."""
     ssh_dir = Path.home() / ".ssh"
     ssh_dir.mkdir(mode=0o700, exist_ok=True)
+    ssh_dir.chmod(0o700)
 
     private_key_path = ssh_dir / key_name
     public_key_path = ssh_dir / f"{key_name}.pub"
 
-    if private_key_path.exists():
+    if private_key_path.exists() and public_key_path.exists():
         logger.info("SSH key already exists at %s", private_key_path)
         return True
 

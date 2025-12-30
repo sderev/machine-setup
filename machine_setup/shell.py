@@ -2,16 +2,20 @@
 
 import logging
 import os
+import pwd
 from pathlib import Path
 
-from machine_setup.utils import command_exists, run
+from machine_setup.utils import command_exists, run, sudo_prefix
 
 logger = logging.getLogger("machine_setup")
 
 
 def get_current_shell() -> str:
     """Get current user's default shell."""
-    return os.environ.get("SHELL", "/bin/bash")
+    try:
+        return pwd.getpwuid(os.getuid()).pw_shell
+    except KeyError:
+        return os.environ.get("SHELL", "/bin/bash")
 
 
 def get_zsh_path() -> str | None:
@@ -40,7 +44,8 @@ def set_default_shell_zsh() -> None:
         shells_content = shells_file.read_text()
         if zsh_path not in shells_content:
             logger.info("Adding %s to /etc/shells", zsh_path)
-            run(["sudo", "sh", "-c", f"echo '{zsh_path}' >> /etc/shells"])
+            sudo = sudo_prefix()
+            run([*sudo, "sh", "-c", f"echo '{zsh_path}' >> /etc/shells"])
 
     logger.info("Setting default shell to zsh...")
     run(["chsh", "-s", zsh_path])
