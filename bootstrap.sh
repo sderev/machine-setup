@@ -28,4 +28,4 @@ cd "$script_dir"
 
 uv venv
 uv pip install -e .
-uv run python -m machine_setup --profile "$PROFILE"
+uv run machine-setup --profile "$PROFILE"
