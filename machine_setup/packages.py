@@ -3,7 +3,7 @@
 import logging
 
 from machine_setup.config import SetupConfig
-from machine_setup.utils import run
+from machine_setup.utils import run, sudo_prefix
 
 logger = logging.getLogger("machine_setup")
 
@@ -30,11 +30,12 @@ def install_packages(config: SetupConfig) -> None:
 
     logger.info("Installing %d packages: %s", len(to_install), ", ".join(to_install))
 
-    run(["sudo", "apt-get", "update", "-qq"])
+    sudo = sudo_prefix()
+    run([*sudo, "apt-get", "update", "-qq"])
 
     run(
         [
-            "sudo",
+            *sudo,
             "apt-get",
             "install",
             "-y",

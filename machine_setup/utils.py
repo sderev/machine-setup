@@ -1,6 +1,7 @@
 """Utility functions for command execution and logging."""
 
 import logging
+import os
 import shutil
 import subprocess
 from collections.abc import Sequence
@@ -40,6 +41,11 @@ def run(
 def command_exists(cmd: str) -> bool:
     """Check if a command exists in PATH."""
     return shutil.which(cmd) is not None
+
+
+def sudo_prefix() -> list[str]:
+    """Return sudo prefix when not running as root."""
+    return [] if os.geteuid() == 0 else ["sudo"]
 
 
 def path_exists(path: str | Path) -> bool:
