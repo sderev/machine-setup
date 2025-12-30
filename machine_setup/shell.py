@@ -48,7 +48,9 @@ def set_default_shell_zsh() -> None:
             run([*sudo, "sh", "-c", f"echo '{zsh_path}' >> /etc/shells"])
 
     logger.info("Setting default shell to zsh...")
-    run(["chsh", "-s", zsh_path])
+    username = pwd.getpwuid(os.getuid()).pw_name
+    sudo = sudo_prefix()
+    run([*sudo, "chsh", "-s", zsh_path, username])
 
     logger.info("Default shell changed to zsh (effective on next login)")
 
