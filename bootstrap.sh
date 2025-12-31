@@ -4,14 +4,14 @@ set -euo pipefail
 PROFILE="${1:-dev}"
 
 if [[ "$(id -u)" -ne 0 ]]; then
-  echo "This script must be run as root." >&2
-  exit 1
+	echo "This script must be run as root." >&2
+	exit 1
 fi
 
 timestamp=$(date +"%Y%m%d%H%M%S")
 cp /etc/apt/sources.list "/etc/apt/sources.list.bak.${timestamp}"
 
-cat > /etc/apt/sources.list <<'SOURCES'
+cat >/etc/apt/sources.list <<'SOURCES'
 deb http://deb.debian.org/debian sid main contrib non-free non-free-firmware
 deb-src http://deb.debian.org/debian sid main contrib non-free non-free-firmware
 SOURCES

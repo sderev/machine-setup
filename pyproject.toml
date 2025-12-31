@@ -3,7 +3,7 @@ name = "machine-setup"
 version = "0.1.0"
 description = "Automated machine setup for Debian sid"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 license = "MIT"
 authors = [
     { name = "Sebastien De Reviere", email = "contact@sderev.com" }
@@ -11,7 +11,7 @@ authors = [
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["ruff"]
+dev = ["ruff", "pytest", "scriv"]
 
 [project.scripts]
 machine-setup = "machine_setup.main:main"
@@ -25,11 +25,19 @@ packages = ["machine_setup"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+extend-select = ["I001"]
+
+[tool.scriv]
+format = "md"
+fragment_directory = "changelog.d"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.10"
 strict = true
