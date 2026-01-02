@@ -8,7 +8,7 @@ license = "MIT"
 authors = [
     { name = "Sebastien De Reviere", email = "contact@sderev.com" }
 ]
-dependencies = []
+dependencies = ["click>=8.0"]
 
 [project.optional-dependencies]
 dev = ["ruff", "pytest", "scriv"]

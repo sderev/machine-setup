@@ -188,6 +188,9 @@ wheels = [
 name = "machine-setup"
 version = "0.1.0"
 source = { editable = "." }
+dependencies = [
+    { name = "click" },
+]
 
 [package.optional-dependencies]
 dev = [
@@ -198,6 +201,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "click", specifier = ">=8.0" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "ruff", marker = "extra == 'dev'" },
     { name = "scriv", marker = "extra == 'dev'" },
