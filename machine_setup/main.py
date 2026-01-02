@@ -10,6 +10,7 @@ from machine_setup.dotfiles import clone_dotfiles, stow_dotfiles
 from machine_setup.packages import install_packages
 from machine_setup.secrets import setup_ssh
 from machine_setup.shell import setup_shell
+from machine_setup.tools import install_uv_tools
 from machine_setup.utils import setup_logging
 from machine_setup.vim_setup import setup_vim
 
@@ -88,6 +89,8 @@ def main(
         if not skip_packages:
             logger.info("=== Installing packages ===")
             install_packages(config)
+            logger.info("=== Installing uv tools ===")
+            install_uv_tools(config.get_uv_tools())
 
         if not skip_dotfiles:
             logger.info("=== Setting up dotfiles ===")
