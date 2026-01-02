@@ -1,10 +1,10 @@
 [project]
 name = "machine-setup"
 version = "0.1.0"
-description = "Automated machine setup for Debian sid"
+description = "Automated machine setup for Debian development environments"
 readme = "README.md"
 requires-python = ">=3.10"
-license = "MIT"
+license = { file = "LICENSE" }
 authors = [
     { name = "Sebastien De Reviere", email = "contact@sderev.com" }
 ]

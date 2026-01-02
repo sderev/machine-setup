@@ -72,7 +72,7 @@ def main(
     skip_vim: bool,
     verbose: bool,
 ) -> None:
-    """Automated machine setup for Debian sid."""
+    """Automated machine setup for Debian development environments."""
     setup_logging(verbose)
 
     profile_enum = Profile(profile)
