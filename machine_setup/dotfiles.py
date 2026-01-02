@@ -6,14 +6,19 @@ from datetime import datetime
 from pathlib import Path
 
 from machine_setup.config import SetupConfig
-from machine_setup.utils import run
+from machine_setup.utils import command_exists, run
 
 logger = logging.getLogger("machine_setup")
 
 
 def remove_default_dotfiles(home: Path) -> None:
-    """Remove shell skeleton files that conflict with stow."""
-    default_dotfiles = (".bashrc", ".profile", ".bash_logout")
+    """Remove skeleton/default dotfiles that conflict with stow."""
+    default_dotfiles = (
+        ".bashrc",
+        ".profile",
+        ".bash_logout",
+        ".gitconfig",
+    )
 
     for dotfile in default_dotfiles:
         target = home / dotfile
@@ -30,27 +35,59 @@ def remove_default_dotfiles(home: Path) -> None:
             shutil.move(str(target), backup_path)
 
 
+def ensure_github_auth(repo_url: str) -> None:
+    """Ensure gh auth for GitHub HTTPS repos."""
+    if not repo_url.startswith("https://github.com/"):
+        return
+
+    if not command_exists("gh"):
+        logger.warning("gh CLI not found; HTTPS clone may require manual credentials")
+        return
+
+    status = run(["gh", "auth", "status", "--hostname", "github.com"], check=False, capture=True)
+    if status.returncode != 0:
+        logger.info("Authenticating to GitHub via device flow...")
+        run(
+            ["gh", "auth", "login", "--hostname", "github.com", "--git-protocol", "https"],
+            check=True,
+        )
+
+    run(["gh", "auth", "setup-git"], check=False)
+
+
 def clone_dotfiles(config: SetupConfig) -> Path:
     """Clone dotfiles repo if not present."""
     dotfiles_path = Path(config.dotfiles_dir).expanduser()
+    target_branch = config.dotfiles_branch
+    repo_url = config.dotfiles_repo
+
+    if dotfiles_path.exists():
+        result = run(
+            ["git", "-C", str(dotfiles_path), "remote", "get-url", "origin"],
+            check=False,
+            capture=True,
+        )
+        if result.returncode == 0:
+            repo_url = result.stdout.strip()
+
+    ensure_github_auth(repo_url)
 
     if dotfiles_path.exists():
         logger.info("Dotfiles already cloned at %s", dotfiles_path)
-        run(["git", "-C", str(dotfiles_path), "pull", "--ff-only"], check=False)
+        # Ensure we're on the requested branch
+        run(["git", "-C", str(dotfiles_path), "checkout", target_branch])
+        pull_result = run(
+            ["git", "-C", str(dotfiles_path), "pull", "--ff-only"],
+            check=False,
+        )
+        if pull_result.returncode != 0:
+            logger.warning("Dotfiles repo not updated; `git pull --ff-only` failed.")
         return dotfiles_path
 
-    logger.info("Cloning dotfiles from %s", config.dotfiles_repo)
-    run(["git", "clone", config.dotfiles_repo, str(dotfiles_path)])
+    logger.info("Cloning dotfiles from %s (branch: %s)", config.dotfiles_repo, target_branch)
+    run(["git", "clone", "--branch", target_branch, config.dotfiles_repo, str(dotfiles_path)])
 
     return dotfiles_path
-
-
-def backup_existing_file(path: Path) -> None:
-    """Backup existing file before stowing."""
-    if path.exists() and not path.is_symlink():
-        backup_path = path.with_suffix(f"{path.suffix}.bak")
-        logger.info("Backing up %s to %s", path, backup_path)
-        path.rename(backup_path)
 
 
 def stow_dotfiles(config: SetupConfig, dotfiles_path: Path) -> None:

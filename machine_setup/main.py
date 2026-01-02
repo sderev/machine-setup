@@ -7,7 +7,7 @@ import sys
 from machine_setup.config import Profile, SetupConfig
 from machine_setup.dotfiles import clone_dotfiles, stow_dotfiles
 from machine_setup.packages import install_packages
-from machine_setup.secrets import setup_secrets
+from machine_setup.secrets import setup_ssh
 from machine_setup.shell import setup_shell
 from machine_setup.utils import setup_logging
 from machine_setup.vim_setup import setup_vim
@@ -34,14 +34,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dotfiles-repo",
         type=str,
-        default="git@github.com:sderev/.dotfiles_private.git",
+        default="https://github.com/sderev/.dotfiles_private.git",
         help="Dotfiles git repository URL",
     )
 
     parser.add_argument(
-        "--skip-secrets",
+        "--dotfiles-branch",
+        type=str,
+        default="main",
+        help="Dotfiles git branch to checkout",
+    )
+
+    parser.add_argument(
+        "--generate-ssh-key",
         action="store_true",
-        help="Skip secrets setup via Proton Pass",
+        help="Generate SSH key and add to GitHub",
     )
 
     parser.add_argument(
@@ -83,7 +90,7 @@ def main() -> int:
     config = SetupConfig(
         profile=profile,
         dotfiles_repo=args.dotfiles_repo,
-        skip_secrets=args.skip_secrets,
+        dotfiles_branch=args.dotfiles_branch,
     )
 
     try:
@@ -96,9 +103,9 @@ def main() -> int:
             dotfiles_path = clone_dotfiles(config)
             stow_dotfiles(config, dotfiles_path)
 
-        if not args.skip_secrets:
-            logger.info("=== Setting up secrets ===")
-            setup_secrets(args.skip_secrets)
+        if args.generate_ssh_key:
+            logger.info("=== Setting up SSH key ===")
+            setup_ssh(generate=args.generate_ssh_key)
 
         if not args.skip_vim:
             logger.info("=== Setting up vim ===")
