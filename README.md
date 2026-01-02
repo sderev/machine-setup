@@ -1,3 +1,3 @@
 # machine-setup
 
-Automated machine setup for Debian sid.
+Automated machine setup for Debian development environments.
