@@ -80,10 +80,10 @@ class SetupConfig:
     """Configuration for the setup process."""
 
     profile: Profile
-    dotfiles_repo: str = "git@github.com:sderev/.dotfiles_private.git"
+    dotfiles_repo: str = "https://github.com/sderev/.dotfiles_private.git"
     dotfiles_dir: str = "~/.dotfiles_private"
+    dotfiles_branch: str = "main"
     home_dir: str = "~"
-    skip_secrets: bool = False
 
     def get_packages(self) -> list[str]:
         """Return packages for current profile (cumulative)."""
