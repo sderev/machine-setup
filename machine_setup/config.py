@@ -59,6 +59,23 @@ PACKAGES_FULL: Final[list[str]] = [
     "clang-format",
 ]
 
+UV_TOOLS_MINIMAL: Final[list[str]] = []
+
+UV_TOOLS_DEV: Final[list[str]] = [
+    "ruff",
+    "ty",
+    "lmterminal",
+    "lmtoolbox",
+    "wslshot",
+    "toc-markdown",
+    "ast-grep-cli",
+    "files-to-prompt",
+    "llm",
+    "vocabmaster",
+]
+
+UV_TOOLS_FULL: Final[list[str]] = []
+
 STOW_PACKAGES: Final[dict[Profile, list[str]]] = {
     Profile.MINIMAL: ["shell", "git"],
     Profile.DEV: ["shell", "git", "vim", "tmux", "scripts", "config", "ai-tools"],
@@ -97,3 +114,12 @@ class SetupConfig:
     def get_stow_packages(self) -> list[str]:
         """Return stow packages for current profile."""
         return STOW_PACKAGES[self.profile]
+
+    def get_uv_tools(self) -> list[str]:
+        """Return uv tools for current profile (cumulative)."""
+        tools = list(UV_TOOLS_MINIMAL)
+        if self.profile in (Profile.DEV, Profile.FULL):
+            tools.extend(UV_TOOLS_DEV)
+        if self.profile == Profile.FULL:
+            tools.extend(UV_TOOLS_FULL)
+        return tools
