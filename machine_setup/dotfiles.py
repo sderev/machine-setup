@@ -2,6 +2,7 @@
 
 import logging
 import shutil
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
@@ -90,7 +91,7 @@ def clone_dotfiles(config: SetupConfig) -> Path:
     return dotfiles_path
 
 
-def stow_dotfiles(config: SetupConfig, dotfiles_path: Path) -> None:
+def stow_dotfiles(config: SetupConfig, dotfiles_path: Path, parallel: bool = False) -> None:
     """Symlink dotfiles using GNU Stow."""
     home = Path(config.home_dir).expanduser()
     stow_packages = config.get_stow_packages()
@@ -99,12 +100,15 @@ def stow_dotfiles(config: SetupConfig, dotfiles_path: Path) -> None:
 
     logger.info("Stowing packages: %s", ", ".join(stow_packages))
 
+    packages_to_stow: list[str] = []
     for package in stow_packages:
         package_path = dotfiles_path / package
         if not package_path.exists():
             logger.warning("Stow package %s not found, skipping", package)
             continue
+        packages_to_stow.append(package)
 
+    def stow_package(package: str) -> None:
         logger.debug("Stowing %s", package)
         run(
             [
@@ -119,5 +123,12 @@ def stow_dotfiles(config: SetupConfig, dotfiles_path: Path) -> None:
                 package,
             ]
         )
+
+    if parallel:
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            list(executor.map(stow_package, packages_to_stow))
+    else:
+        for package in packages_to_stow:
+            stow_package(package)
 
     logger.info("Dotfiles stowed successfully")
