@@ -28,7 +28,7 @@ jobs:
       - name: Validate changelog fragments
         run: |
           set -euo pipefail
-          if ! uv run --extra dev scriv print; then
+          if ! uv run scriv print; then
             status=$?
             if [ "$status" -eq 2 ]; then
               echo "::notice::No changelog fragments to collect"
