@@ -5,7 +5,7 @@ import sys
 
 import click
 
-from machine_setup.config import Profile, SetupConfig
+from machine_setup.config import Preset, SetupConfig
 from machine_setup.dotfiles import clone_dotfiles, stow_dotfiles
 from machine_setup.packages import install_packages
 from machine_setup.secrets import setup_ssh
@@ -19,11 +19,11 @@ logger = logging.getLogger("machine_setup")
 
 @click.command()
 @click.option(
-    "--profile",
+    "--preset",
     "-p",
-    type=click.Choice([p.value for p in Profile], case_sensitive=False),
+    type=click.Choice([p.value for p in Preset], case_sensitive=False),
     default="dev",
-    help="Installation profile (default: dev)",
+    help="Installation preset (default: dev)",
 )
 @click.option(
     "--dotfiles-repo",
@@ -64,7 +64,7 @@ logger = logging.getLogger("machine_setup")
     help="Enable verbose output",
 )
 def main(
-    profile: str,
+    preset: str,
     dotfiles_repo: str,
     dotfiles_branch: str,
     generate_ssh_key: bool,
@@ -76,11 +76,11 @@ def main(
     """Automated machine setup for Debian development environments."""
     setup_logging(verbose)
 
-    profile_enum = Profile(profile)
-    logger.info("Starting machine setup with profile: %s", profile_enum.value)
+    preset_enum = Preset(preset)
+    logger.info("Starting machine setup with preset: %s", preset_enum.value)
 
     config = SetupConfig(
-        profile=profile_enum,
+        preset=preset_enum,
         dotfiles_repo=dotfiles_repo,
         dotfiles_branch=dotfiles_branch,
     )

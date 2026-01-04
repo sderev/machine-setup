@@ -14,21 +14,21 @@ class TestCLI:
         result = runner.invoke(main, ["--help"])
         assert result.exit_code == 0
         assert "Automated machine setup" in result.output
-        assert "--profile" in result.output
+        assert "--preset" in result.output
         assert "--verbose" in result.output
 
-    def test_profile_choices(self):
-        """Test that profile choices are displayed."""
+    def test_preset_choices(self):
+        """Test that preset choices are displayed."""
         runner = CliRunner()
         result = runner.invoke(main, ["--help"])
         assert "minimal" in result.output
         assert "dev" in result.output
         assert "full" in result.output
 
-    def test_invalid_profile(self):
-        """Test that invalid profile is rejected."""
+    def test_invalid_preset(self):
+        """Test that invalid preset is rejected."""
         runner = CliRunner()
-        result = runner.invoke(main, ["--profile", "invalid"])
+        result = runner.invoke(main, ["--preset", "invalid"])
         assert result.exit_code != 0
         assert "Invalid value" in result.output
 
@@ -37,7 +37,7 @@ class TestCLI:
         runner = CliRunner()
         result = runner.invoke(main, ["--help"])
         options = [
-            "--profile",
+            "--preset",
             "--dotfiles-repo",
             "--dotfiles-branch",
             "--generate-ssh-key",
