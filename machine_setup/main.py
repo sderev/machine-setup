@@ -13,6 +13,7 @@ from machine_setup.shell import setup_shell
 from machine_setup.tools import install_uv_tools
 from machine_setup.utils import setup_logging
 from machine_setup.vim_setup import setup_vim
+from machine_setup.windows import setup_windows_configs
 
 logger = logging.getLogger("machine_setup")
 
@@ -58,6 +59,11 @@ logger = logging.getLogger("machine_setup")
     help="Skip vim plugin installation",
 )
 @click.option(
+    "--skip-windows",
+    is_flag=True,
+    help="Skip Windows configuration (WSL only)",
+)
+@click.option(
     "--verbose",
     "-v",
     is_flag=True,
@@ -71,6 +77,7 @@ def main(
     skip_packages: bool,
     skip_dotfiles: bool,
     skip_vim: bool,
+    skip_windows: bool,
     verbose: bool,
 ) -> None:
     """Automated machine setup for Debian development environments."""
@@ -96,6 +103,10 @@ def main(
             logger.info("=== Setting up dotfiles ===")
             dotfiles_path = clone_dotfiles(config)
             stow_dotfiles(config, dotfiles_path)
+
+            if not skip_windows:
+                logger.info("=== Setting up Windows configs ===")
+                setup_windows_configs(dotfiles_path)
 
         if generate_ssh_key:
             logger.info("=== Setting up SSH key ===")
