@@ -19,7 +19,7 @@ def is_package_installed(package: str) -> bool:
 
 
 def install_packages(config: SetupConfig) -> None:
-    """Install packages for the current profile."""
+    """Install packages for the current preset."""
     packages = config.get_packages()
 
     to_install = [package for package in packages if not is_package_installed(package)]

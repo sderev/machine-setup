@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROFILE="${1:-dev}"
+PRESET="${1:-dev}"
 
 if [[ "$(id -u)" -ne 0 ]]; then
 	echo "This script must be run as root (use sudo)." >&2
@@ -73,4 +73,4 @@ cd "$script_dir"
 
 run_as_user "$user_uv" venv --clear
 run_as_user "$user_uv" pip install -e .
-run_as_user "$user_uv" run machine-setup --profile "$PROFILE"
+run_as_user "$user_uv" run machine-setup --preset "$PRESET"
