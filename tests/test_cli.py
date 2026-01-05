@@ -44,6 +44,7 @@ class TestCLI:
             "--skip-packages",
             "--skip-dotfiles",
             "--skip-vim",
+            "--skip-windows",
             "--verbose",
         ]
         for option in options:
