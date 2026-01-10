@@ -121,3 +121,25 @@ def stow_dotfiles(config: SetupConfig, dotfiles_path: Path) -> None:
         )
 
     logger.info("Dotfiles stowed successfully")
+
+
+def setup_scripts_symlink(dotfiles_path: Path, home: Path) -> None:
+    """Create ~/.scripts symlink to dotfiles/scripts.
+
+    Unlike stow packages, scripts uses a direct symlink for simpler workflow.
+    """
+    scripts_src = dotfiles_path / "scripts"
+    scripts_dst = home / ".scripts"
+
+    if not scripts_src.exists():
+        logger.warning("Scripts directory not found: %s", scripts_src)
+        return
+
+    if scripts_dst.is_symlink():
+        scripts_dst.unlink()
+    elif scripts_dst.exists():
+        logger.warning("~/.scripts exists and is not a symlink, skipping")
+        return
+
+    scripts_dst.symlink_to(scripts_src)
+    logger.info("Created symlink: %s -> %s", scripts_dst, scripts_src)

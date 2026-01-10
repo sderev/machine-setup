@@ -2,11 +2,12 @@
 
 import logging
 import sys
+from pathlib import Path
 
 import click
 
 from machine_setup.config import Preset, SetupConfig
-from machine_setup.dotfiles import clone_dotfiles, stow_dotfiles
+from machine_setup.dotfiles import clone_dotfiles, setup_scripts_symlink, stow_dotfiles
 from machine_setup.packages import install_packages
 from machine_setup.secrets import setup_ssh
 from machine_setup.shell import setup_shell
@@ -103,6 +104,8 @@ def main(
             logger.info("=== Setting up dotfiles ===")
             dotfiles_path = clone_dotfiles(config)
             stow_dotfiles(config, dotfiles_path)
+            if config.preset in (Preset.DEV, Preset.FULL):
+                setup_scripts_symlink(dotfiles_path, Path(config.home_dir).expanduser())
 
             if not skip_windows:
                 logger.info("=== Setting up Windows configs ===")

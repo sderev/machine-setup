@@ -78,13 +78,12 @@ UV_TOOLS_FULL: Final[list[str]] = []
 
 STOW_PACKAGES: Final[dict[Preset, list[str]]] = {
     Preset.MINIMAL: ["shell", "git"],
-    Preset.DEV: ["shell", "git", "vim", "tmux", "scripts", "config", "ai-tools"],
+    Preset.DEV: ["shell", "git", "vim", "tmux", "config", "ai-tools"],
     Preset.FULL: [
         "shell",
         "git",
         "vim",
         "tmux",
-        "scripts",
         "config",
         "ai-tools",
         "gui",
