@@ -19,4 +19,6 @@ def install_uv_tools(tools: list[str]) -> None:
 
     for tool in tools:
         logger.info("Installing %s via uv tool...", tool)
-        run(["uv", "tool", "install", tool], check=False)
+        result = run(["uv", "tool", "install", tool], check=False)
+        if result.returncode != 0:
+            logger.warning("uv tool install failed for %s", tool)
