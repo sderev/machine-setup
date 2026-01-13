@@ -17,6 +17,10 @@ def install_vim_plug() -> None:
         logger.debug("vim-plug already installed")
         return
 
+    if not command_exists("curl"):
+        logger.warning("curl not found, cannot download vim-plug")
+        return
+
     logger.info("Installing vim-plug...")
     VIM_PLUG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -58,7 +62,6 @@ def install_vim_plugins() -> None:
 
 def setup_vim() -> None:
     """Complete vim setup."""
-    install_vim_plug()
     install_vim_plugins()
 
     undo_dir = Path.home() / ".vim" / "undo-dir"
