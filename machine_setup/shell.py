@@ -45,7 +45,7 @@ def set_default_shell_zsh() -> None:
         if zsh_path not in shells_content:
             logger.info("Adding %s to /etc/shells", zsh_path)
             sudo = sudo_prefix()
-            run([*sudo, "sh", "-c", f"echo '{zsh_path}' >> /etc/shells"])
+            run([*sudo, "sh", "-c", 'printf "%s\\n" "$1" >> /etc/shells', "_", zsh_path])
 
     logger.info("Setting default shell to zsh...")
     username = pwd.getpwuid(os.getuid()).pw_name
