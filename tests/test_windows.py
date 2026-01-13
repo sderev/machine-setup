@@ -83,23 +83,8 @@ class TestIsWsl:
 class TestGetWindowsUsername:
     """Tests for get_windows_username function."""
 
-    def test_returns_none_when_mnt_c_missing(self, tmp_path, monkeypatch):
+    def test_returns_none_when_mnt_c_missing(self):
         """Test returns None when /mnt/c/Users doesn't exist."""
-        # Point to a non-existent path
-        with patch.object(
-            Path,
-            "__new__",
-            lambda cls, *args: tmp_path / "nonexistent"
-            if args and args[0] == "/mnt/c/Users"
-            else object.__new__(cls),
-        ):
-            # Simpler approach: patch the function to use tmp_path
-            pass
-
-        # Use monkeypatch to make Path("/mnt/c/Users") point elsewhere
-        tmp_path / "mnt" / "c" / "Users"
-        # Don't create it - it shouldn't exist
-
         with patch("machine_setup.windows.Path") as mock_path:
             mock_path.return_value.exists.return_value = False
             result = get_windows_username()
