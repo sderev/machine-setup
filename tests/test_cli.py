@@ -13,7 +13,7 @@ class TestCLI:
         runner = CliRunner()
         result = runner.invoke(main, ["--help"])
         assert result.exit_code == 0
-        assert "Automated machine setup" in result.output
+        assert "Personal development environment bootstrap" in result.output
         assert "--preset" in result.output
         assert "--verbose" in result.output
 

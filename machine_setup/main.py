@@ -81,7 +81,7 @@ def main(
     skip_windows: bool,
     verbose: bool,
 ) -> None:
-    """Automated machine setup for Debian development environments."""
+    """Personal development environment bootstrap."""
     setup_logging(verbose)
 
     preset_enum = Preset(preset)

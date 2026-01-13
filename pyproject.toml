@@ -1,7 +1,7 @@
 [project]
 name = "machine-setup"
 version = "0.1.0"
-description = "Automated machine setup for Debian development environments"
+description = "Personal development environment bootstrap"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
