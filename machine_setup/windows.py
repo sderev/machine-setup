@@ -38,7 +38,7 @@ def get_windows_username() -> str | None:
     current_user = os.environ.get("USER")
 
     fallback_username = None
-    for user_dir in users_path.iterdir():
+    for user_dir in sorted(users_path.iterdir(), key=lambda path: path.name):
         # Verify it looks like a real user folder with AppData
         is_valid_user_dir = (
             user_dir.is_dir() and user_dir.name not in skip and (user_dir / "AppData").exists()

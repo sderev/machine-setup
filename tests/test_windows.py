@@ -130,6 +130,74 @@ class TestGetWindowsUsername:
             result = get_windows_username()
             assert result == "WithAppData"
 
+    def test_falls_back_to_sorted_username(self, tmp_path, monkeypatch):
+        """Test deterministic fallback selection when multiple users exist."""
+        users_dir = tmp_path / "Users"
+        users_dir.mkdir()
+
+        user_bob = users_dir / "bob"
+        user_bob.mkdir()
+        (user_bob / "AppData").mkdir()
+
+        user_alice = users_dir / "alice"
+        user_alice.mkdir()
+        (user_alice / "AppData").mkdir()
+
+        monkeypatch.delenv("USER", raising=False)
+
+        def fake_path(*args, **kwargs):
+            if args and args[0] == "/mnt/c/Users":
+                return users_dir
+            return Path(*args, **kwargs)
+
+        original_iterdir = type(users_dir).iterdir
+
+        def fake_iterdir(self):
+            if self == users_dir:
+                return iter([user_bob, user_alice])
+            return original_iterdir(self)
+
+        with (
+            patch("machine_setup.windows.Path", side_effect=fake_path),
+            patch.object(type(users_dir), "iterdir", fake_iterdir),
+        ):
+            result = get_windows_username()
+            assert result == "alice"
+
+    def test_prefers_current_user_over_sorted_fallback(self, tmp_path, monkeypatch):
+        """Test current Linux user is preferred over sorted fallback."""
+        users_dir = tmp_path / "Users"
+        users_dir.mkdir()
+
+        user_alice = users_dir / "alice"
+        user_alice.mkdir()
+        (user_alice / "AppData").mkdir()
+
+        user_bob = users_dir / "bob"
+        user_bob.mkdir()
+        (user_bob / "AppData").mkdir()
+
+        monkeypatch.setenv("USER", "bob")
+
+        def fake_path(*args, **kwargs):
+            if args and args[0] == "/mnt/c/Users":
+                return users_dir
+            return Path(*args, **kwargs)
+
+        original_iterdir = type(users_dir).iterdir
+
+        def fake_iterdir(self):
+            if self == users_dir:
+                return iter([user_bob, user_alice])
+            return original_iterdir(self)
+
+        with (
+            patch("machine_setup.windows.Path", side_effect=fake_path),
+            patch.object(type(users_dir), "iterdir", fake_iterdir),
+        ):
+            result = get_windows_username()
+            assert result == "bob"
+
     def test_returns_none_when_no_valid_users(self, tmp_path, monkeypatch):
         """Test returns None when no valid user folders exist."""
         users_dir = tmp_path / "Users"
