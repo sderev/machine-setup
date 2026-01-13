@@ -25,12 +25,8 @@ def remove_default_dotfiles(home: Path) -> None:
         if target.is_symlink():
             continue
         if target.is_file():
-            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
             backup_path = target.with_name(f"{target.name}.bak.{timestamp}")
-            suffix = 0
-            while backup_path.exists():
-                suffix += 1
-                backup_path = target.with_name(f"{target.name}.bak.{timestamp}.{suffix}")
             logger.info("Backing up %s to %s before stow", target, backup_path)
             shutil.move(str(target), backup_path)
 
