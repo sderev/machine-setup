@@ -34,6 +34,8 @@ PACKAGES_DEV: Final[list[str]] = [
     "g++",
     "make",
     "golang",
+    "nodejs",
+    "npm",
     "python3",
     "python-is-python3",
     "python3-venv",
@@ -75,6 +77,17 @@ UV_TOOLS_DEV: Final[list[str]] = [
 ]
 
 UV_TOOLS_FULL: Final[list[str]] = []
+
+NPM_TOOLS_MINIMAL: Final[list[str]] = []
+
+NPM_TOOLS_DEV: Final[list[str]] = [
+    "@openai/codex",
+    "@ccusage/codex",
+    "opencode-ai",
+    "n",
+]
+
+NPM_TOOLS_FULL: Final[list[str]] = []
 
 STOW_PACKAGES: Final[dict[Preset, list[str]]] = {
     Preset.MINIMAL: ["shell", "git"],
@@ -121,4 +134,13 @@ class SetupConfig:
             tools.extend(UV_TOOLS_DEV)
         if self.preset == Preset.FULL:
             tools.extend(UV_TOOLS_FULL)
+        return tools
+
+    def get_npm_tools(self) -> list[str]:
+        """Return npm tools for current preset (cumulative)."""
+        tools = list(NPM_TOOLS_MINIMAL)
+        if self.preset in (Preset.DEV, Preset.FULL):
+            tools.extend(NPM_TOOLS_DEV)
+        if self.preset == Preset.FULL:
+            tools.extend(NPM_TOOLS_FULL)
         return tools

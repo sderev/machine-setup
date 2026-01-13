@@ -3,6 +3,9 @@
 import pytest
 
 from machine_setup.config import (
+    NPM_TOOLS_DEV,
+    NPM_TOOLS_FULL,
+    NPM_TOOLS_MINIMAL,
     PACKAGES_DEV,
     PACKAGES_FULL,
     PACKAGES_MINIMAL,
@@ -114,3 +117,27 @@ class TestGetStowPackages:
             stow_pkgs = config.get_stow_packages()
             assert "shell" in stow_pkgs
             assert "git" in stow_pkgs
+
+
+class TestGetNpmTools:
+    """Tests for SetupConfig.get_npm_tools method."""
+
+    def test_minimal_npm_tools(self):
+        """Test minimal preset returns minimal npm tools."""
+        config = SetupConfig(preset=Preset.MINIMAL)
+        tools = config.get_npm_tools()
+        assert set(tools) == set(NPM_TOOLS_MINIMAL)
+
+    def test_dev_npm_tools(self):
+        """Test dev preset returns minimal + dev npm tools."""
+        config = SetupConfig(preset=Preset.DEV)
+        tools = config.get_npm_tools()
+        expected = set(NPM_TOOLS_MINIMAL) | set(NPM_TOOLS_DEV)
+        assert set(tools) == expected
+
+    def test_full_npm_tools(self):
+        """Test full preset returns all npm tools."""
+        config = SetupConfig(preset=Preset.FULL)
+        tools = config.get_npm_tools()
+        expected = set(NPM_TOOLS_MINIMAL) | set(NPM_TOOLS_DEV) | set(NPM_TOOLS_FULL)
+        assert set(tools) == expected

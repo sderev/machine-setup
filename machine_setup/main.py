@@ -8,6 +8,7 @@ import click
 
 from machine_setup.config import Preset, SetupConfig
 from machine_setup.dotfiles import clone_dotfiles, setup_scripts_symlink, stow_dotfiles
+from machine_setup.npm_tools import install_npm_tools
 from machine_setup.packages import install_packages
 from machine_setup.secrets import setup_ssh
 from machine_setup.shell import setup_shell
@@ -99,6 +100,8 @@ def main(
             install_packages(config)
             logger.info("=== Installing uv tools ===")
             install_uv_tools(config.get_uv_tools())
+            logger.info("=== Installing npm tools ===")
+            install_npm_tools(config.get_npm_tools())
 
         if not skip_dotfiles:
             logger.info("=== Setting up dotfiles ===")
