@@ -1,13 +1,9 @@
 """Tests for npm_tools module."""
 
 import logging
+from types import SimpleNamespace
 
 from machine_setup import npm_tools
-
-
-class _Result:
-    def __init__(self, returncode: int) -> None:
-        self.returncode = returncode
 
 
 def test_install_npm_tools_uses_sudo_prefix(monkeypatch) -> None:
@@ -19,7 +15,7 @@ def test_install_npm_tools_uses_sudo_prefix(monkeypatch) -> None:
 
     def fake_run(cmd, check=True, capture=False, env=None):
         calls.append(list(cmd))
-        return _Result(0)
+        return SimpleNamespace(returncode=0)
 
     monkeypatch.setattr(npm_tools, "run", fake_run)
 
@@ -38,7 +34,7 @@ def test_install_npm_tools_skips_empty_list(monkeypatch, caplog) -> None:
 
     def fake_run(cmd, check=True, capture=False, env=None):
         calls["run"] = True
-        return _Result(0)
+        return SimpleNamespace(returncode=0)
 
     monkeypatch.setattr(npm_tools, "command_exists", fake_command_exists)
     monkeypatch.setattr(npm_tools, "run", fake_run)
@@ -56,7 +52,7 @@ def test_install_npm_tools_skips_when_npm_missing(monkeypatch, caplog) -> None:
 
     def fake_run(cmd, check=True, capture=False, env=None):
         calls["run"] = True
-        return _Result(0)
+        return SimpleNamespace(returncode=0)
 
     monkeypatch.setattr(npm_tools, "command_exists", lambda _: False)
     monkeypatch.setattr(npm_tools, "run", fake_run)
@@ -74,7 +70,7 @@ def test_install_npm_tools_warns_on_failure(monkeypatch, caplog) -> None:
     monkeypatch.setattr(npm_tools, "sudo_prefix", lambda: [])
 
     def fake_run(cmd, check=True, capture=False, env=None):
-        return _Result(1)
+        return SimpleNamespace(returncode=1)
 
     monkeypatch.setattr(npm_tools, "run", fake_run)
 
