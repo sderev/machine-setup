@@ -61,7 +61,11 @@ SOURCES
 configure_apt_sources
 
 apt-get update
-apt-get install -y curl ca-certificates python3-minimal python3-venv
+apt-get install -y curl ca-certificates python3-minimal
+
+# Set timezone to Europe/Paris
+ln -sf /usr/share/zoneinfo/Europe/Paris /etc/localtime
+echo "Europe/Paris" >/etc/timezone
 
 user_uv="${setup_home}/.local/bin/uv"
 if [[ ! -x "$user_uv" ]]; then
