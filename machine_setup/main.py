@@ -6,6 +6,7 @@ from pathlib import Path
 
 import click
 
+from machine_setup.claude_code import install_claude_code
 from machine_setup.config import Preset, SetupConfig
 from machine_setup.dotfiles import clone_dotfiles, setup_scripts_symlink, stow_dotfiles
 from machine_setup.npm_tools import install_npm_tools
@@ -102,6 +103,9 @@ def main(
             install_uv_tools(config.get_uv_tools())
             logger.info("=== Installing npm tools ===")
             install_npm_tools(config.get_npm_tools())
+            if config.preset in (Preset.DEV, Preset.FULL):
+                logger.info("=== Installing Claude Code ===")
+                install_claude_code()
 
         if not skip_dotfiles:
             logger.info("=== Setting up dotfiles ===")
