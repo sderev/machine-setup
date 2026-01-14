@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Final
 
 
 class Preset(str, Enum):
@@ -11,7 +10,7 @@ class Preset(str, Enum):
     FULL = "full"  # Workstations: everything + GUI
 
 
-PACKAGES_MINIMAL: Final[list[str]] = [
+PACKAGES_MINIMAL: list[str] = [
     "git",
     "vim",
     "zsh",
@@ -29,7 +28,7 @@ PACKAGES_MINIMAL: Final[list[str]] = [
     "ca-certificates",
 ]
 
-PACKAGES_DEV: Final[list[str]] = [
+PACKAGES_DEV: list[str] = [
     "gcc",
     "g++",
     "make",
@@ -50,7 +49,7 @@ PACKAGES_DEV: Final[list[str]] = [
     "ssh",
 ]
 
-PACKAGES_FULL: Final[list[str]] = [
+PACKAGES_FULL: list[str] = [
     "texlive",
     "tex-common",
     "latexmk",
@@ -61,9 +60,9 @@ PACKAGES_FULL: Final[list[str]] = [
     "clang-format",
 ]
 
-UV_TOOLS_MINIMAL: Final[list[str]] = []
+UV_TOOLS_MINIMAL: list[str] = []
 
-UV_TOOLS_DEV: Final[list[str]] = [
+UV_TOOLS_DEV: list[str] = [
     "ruff",
     "ty",
     "lmterminal",
@@ -76,20 +75,20 @@ UV_TOOLS_DEV: Final[list[str]] = [
     "vocabmaster",
 ]
 
-UV_TOOLS_FULL: Final[list[str]] = []
+UV_TOOLS_FULL: list[str] = []
 
-NPM_TOOLS_MINIMAL: Final[list[str]] = []
+NPM_TOOLS_MINIMAL: list[str] = []
 
-NPM_TOOLS_DEV: Final[list[str]] = [
+NPM_TOOLS_DEV: list[str] = [
     "@openai/codex",
     "@ccusage/codex",
     "opencode-ai",
     "n",
 ]
 
-NPM_TOOLS_FULL: Final[list[str]] = []
+NPM_TOOLS_FULL: list[str] = []
 
-STOW_PACKAGES: Final[dict[Preset, list[str]]] = {
+STOW_PACKAGES: dict[Preset, list[str]] = {
     Preset.MINIMAL: ["shell", "git"],
     Preset.DEV: ["shell", "git", "vim", "tmux", "config", "ai-tools"],
     Preset.FULL: [
