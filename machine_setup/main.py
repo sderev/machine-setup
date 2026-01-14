@@ -8,6 +8,7 @@ import click
 
 from machine_setup.config import Preset, SetupConfig
 from machine_setup.dotfiles import clone_dotfiles, setup_scripts_symlink, stow_dotfiles
+from machine_setup.ipython_setup import setup_ipython_math_profile
 from machine_setup.npm_tools import install_npm_tools
 from machine_setup.packages import install_packages
 from machine_setup.secrets import setup_ssh
@@ -124,6 +125,10 @@ def main(
         if not skip_vim:
             logger.info("=== Setting up vim ===")
             setup_vim()
+
+        if config.preset in (Preset.DEV, Preset.FULL):
+            logger.info("=== Setting up IPython math profile ===")
+            setup_ipython_math_profile()
 
         logger.info("=== Configuring shell ===")
         setup_shell()
