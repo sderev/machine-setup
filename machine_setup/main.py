@@ -6,14 +6,13 @@ from pathlib import Path
 
 import click
 
-from machine_setup.claude_code import install_claude_code
 from machine_setup.config import Preset, SetupConfig
 from machine_setup.dotfiles import clone_dotfiles, setup_scripts_symlink, stow_dotfiles
 from machine_setup.npm_tools import install_npm_tools
 from machine_setup.packages import install_packages
 from machine_setup.secrets import setup_ssh
 from machine_setup.shell import setup_shell
-from machine_setup.tools import install_uv_tools
+from machine_setup.tools import install_claude_code, install_uv_tools
 from machine_setup.utils import setup_logging
 from machine_setup.vim_setup import setup_vim
 from machine_setup.windows import setup_windows_configs
