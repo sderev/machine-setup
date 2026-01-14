@@ -25,7 +25,6 @@ PACKAGES_MINIMAL: list[str] = [
     "stow",
     "sudo",
     "tmux",
-    "uv",
     "vim",
     "wget",
     "zsh",
@@ -56,7 +55,7 @@ PACKAGES_DEV: list[str] = [
     "podman",
     "python-is-python3",
     "python3",
-    "python3-ipython",
+    "ipython3",
     "rlwrap",
     "rsync",
     "rustc",
@@ -118,7 +117,7 @@ NPM_TOOLS_FULL: list[str] = []
 
 STOW_PACKAGES: dict[Preset, list[str]] = {
     Preset.MINIMAL: ["shell", "git"],
-    Preset.DEV: ["shell", "git", "vim", "tmux", "config", "ai-tools"],
+    Preset.DEV: ["shell", "git", "vim", "tmux", "config", "ai-tools", "misc"],
     Preset.FULL: [
         "shell",
         "git",
@@ -126,6 +125,7 @@ STOW_PACKAGES: dict[Preset, list[str]] = {
         "tmux",
         "config",
         "ai-tools",
+        "misc",
         "gui",
     ],
 }
