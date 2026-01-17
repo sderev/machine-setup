@@ -192,7 +192,7 @@ dependencies = [
     { name = "click" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
     { name = "pytest" },
     { name = "ruff" },
@@ -200,13 +200,14 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "click", specifier = ">=8.0" },
-    { name = "pytest", marker = "extra == 'dev'" },
-    { name = "ruff", marker = "extra == 'dev'" },
-    { name = "scriv", marker = "extra == 'dev'" },
+requires-dist = [{ name = "click", specifier = ">=8.0" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest" },
+    { name = "ruff" },
+    { name = "scriv" },
 ]
-provides-extras = ["dev"]
 
 [[package]]
 name = "markdown-it-py"

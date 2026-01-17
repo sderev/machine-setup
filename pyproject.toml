@@ -10,11 +10,11 @@ authors = [
 ]
 dependencies = ["click>=8.0"]
 
-[project.optional-dependencies]
-dev = ["ruff", "pytest", "scriv"]
-
 [project.scripts]
 machine-setup = "machine_setup.main:main"
+
+[dependency-groups]
+dev = ["ruff", "pytest", "scriv"]
 
 [build-system]
 requires = ["hatchling"]
