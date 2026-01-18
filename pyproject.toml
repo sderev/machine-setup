@@ -14,7 +14,13 @@ dependencies = ["click>=8.0"]
 machine-setup = "machine_setup.main:main"
 
 [dependency-groups]
-dev = ["ruff", "pytest", "scriv"]
+dev = [
+    "ruff",
+    "pytest",
+    "scriv",
+    # urllib3 is a transitive dependency of scriv (via requests). Pinned to fix CVE-2026-21441.
+    "urllib3>=2.6.3",
+]
 
 [build-system]
 requires = ["hatchling"]
