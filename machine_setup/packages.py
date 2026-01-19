@@ -1,6 +1,7 @@
 """Package installation logic."""
 
 import logging
+import subprocess
 
 from machine_setup.config import SetupConfig
 from machine_setup.utils import run, sudo_prefix
@@ -32,6 +33,15 @@ def install_packages(config: SetupConfig) -> None:
 
     sudo = sudo_prefix()
     run([*sudo, "apt-get", "update", "-qq"])
+
+    # Preseed msmtp debconf to enable AppArmor and skip interactive prompt
+    if "msmtp" in to_install or "msmtp-mta" in to_install:
+        subprocess.run(
+            [*sudo, "debconf-set-selections"],
+            input="msmtp msmtp/apparmor boolean true\n",
+            text=True,
+            check=True,
+        )
 
     run(
         [
