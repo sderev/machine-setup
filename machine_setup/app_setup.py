@@ -57,12 +57,8 @@ def install_vim_plugins() -> None:
     run(
         [
             "vim",
-            "-E",
-            "-s",
-            "-c",
-            "PlugInstall",
-            "-c",
-            "qa!",
+            "+PlugInstall --sync",
+            "+qa",
         ],
         check=False,
     )
