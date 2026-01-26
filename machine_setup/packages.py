@@ -33,6 +33,8 @@ def install_packages(config: SetupConfig) -> None:
 
     sudo = sudo_prefix()
     run([*sudo, "apt-get", "update", "-qq"])
+    logger.info("Upgrading system packages...")
+    run([*sudo, "apt-get", "upgrade", "-y", "-qq"])
 
     # Preseed msmtp debconf to enable AppArmor and skip interactive prompt
     if "msmtp" in to_install or "msmtp-mta" in to_install:
