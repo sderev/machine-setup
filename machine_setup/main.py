@@ -9,6 +9,7 @@ import click
 from machine_setup.config import Preset, SetupConfig
 from machine_setup.dotfiles import clone_dotfiles, setup_scripts_symlink, stow_dotfiles
 from machine_setup.ipython_setup import setup_ipython_math_profile
+from machine_setup.locale import setup_locale
 from machine_setup.npm_tools import install_npm_tools
 from machine_setup.packages import install_packages, install_quarto
 from machine_setup.secrets import setup_ssh
@@ -132,6 +133,9 @@ def main(
         if config.preset in (Preset.DEV, Preset.FULL):
             logger.info("=== Setting up IPython math profile ===")
             setup_ipython_math_profile()
+
+        logger.info("=== Configuring locale ===")
+        setup_locale()
 
         logger.info("=== Configuring shell ===")
         setup_shell()

@@ -20,6 +20,7 @@ PACKAGES_MINIMAL: list[str] = [
     "gh",
     "git",
     "jq",
+    "locales",
     "man",
     "ripgrep",
     "stow",

@@ -30,8 +30,10 @@ forwarded to `machine-setup`.
 2. Runs `apt-get upgrade`
 3. Installs `uv` (Python package manager)
 4. Installs apt packages, `uv` tools, npm tools (per preset)
-5. Clones and stows dotfiles from `~/.dotfiles_private`
-6. Sets zsh as default shell; installs vim plugins (`--skip-vim` to skip); creates `ipython-math` environment (dev/full only)
+5. Creates repos directory structure (`~/Repos/github.com/{clone,forks,sderev}/`)
+6. Clones and stows dotfiles from `~/Repos/github.com/sderev/.dotfiles_private`
+7. Generates the `en_US.UTF-8` locale if needed
+8. Sets zsh as default shell; installs vim plugins (`--skip-vim` to skip); creates `ipython-math` environment (dev/full only)
 
 ## SSH key generation
 
