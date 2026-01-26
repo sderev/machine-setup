@@ -86,7 +86,6 @@ PACKAGES_FULL: list[str] = [
     "pandoc",
     "poppler-utils",
     "qpdf",
-    "quarto",
     "rename",
     "tex-common",
     "texlive",
