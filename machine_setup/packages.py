@@ -1,4 +1,7 @@
-"""Package installation logic."""
+"""Package installation logic.
+
+Includes apt packages, npm tools, locale configuration, and Quarto installation.
+"""
 
 import json
 import logging
@@ -12,6 +15,9 @@ from machine_setup.config import SetupConfig
 from machine_setup.utils import command_exists, run, sudo_prefix
 
 logger = logging.getLogger("machine_setup")
+
+# Locale configuration
+LOCALE = "en_US.UTF-8"
 
 
 def is_package_installed(package: str) -> bool:
@@ -126,3 +132,68 @@ def install_quarto() -> None:
                 os.remove(deb_path)
             except OSError:
                 logger.warning("Failed to remove temporary Quarto package: %s", deb_path)
+
+
+# --- Locale configuration ---
+
+
+def is_locale_generated(locale: str) -> bool:
+    """Check if a locale is already generated."""
+    result = run(["locale", "-a"], check=True, capture=True)
+    return locale.replace("UTF-8", "utf8") in result.stdout
+
+
+def generate_locale(locale: str) -> None:
+    """Generate specified locale using locale-gen."""
+    logger.info("Generating locale: %s", locale)
+    sudo = sudo_prefix()
+
+    sed_escape = locale.replace(".", "\\.")
+
+    run(
+        [
+            *sudo,
+            "sed",
+            "-i",
+            "-e",
+            f"s/^# *{sed_escape}/{locale}/",
+            "/etc/locale.gen",
+        ]
+    )
+    run([*sudo, "locale-gen"])
+    logger.info("Locale generation complete")
+
+
+def setup_locale() -> None:
+    """Configure UTF-8 locale."""
+    if is_locale_generated(LOCALE):
+        logger.info("Locale %s already generated", LOCALE)
+        return
+
+    locale_gen = run(["which", "locale-gen"], check=False, capture=True)
+    if locale_gen.returncode != 0:
+        logger.warning("locale-gen not found; skipping locale configuration")
+        return
+
+    generate_locale(LOCALE)
+
+
+# --- npm tools ---
+
+
+def install_npm_tools(tools: list[str]) -> None:
+    """Install npm tools using npm install -g."""
+    if not tools:
+        logger.info("No npm tools to install")
+        return
+
+    if not command_exists("npm"):
+        logger.warning("npm not found; skipping npm tool installation")
+        return
+
+    sudo = sudo_prefix()
+    for tool in tools:
+        logger.info("Installing %s via npm...", tool)
+        result = run([*sudo, "npm", "install", "-g", tool], check=False)
+        if result.returncode != 0:
+            logger.warning("npm tool install failed for %s", tool)
