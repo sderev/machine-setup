@@ -5,7 +5,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from machine_setup.config import SetupConfig
+from machine_setup.presets import SetupConfig
 from machine_setup.utils import command_exists, run
 
 logger = logging.getLogger("machine_setup")

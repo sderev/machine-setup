@@ -1,6 +1,6 @@
-"""Development environment setup.
+"""Application setup.
 
-Includes vim plugins, IPython math profile, and shell configuration.
+Post-install configuration: vim plugins, IPython math profile, and shell configuration.
 """
 
 import logging

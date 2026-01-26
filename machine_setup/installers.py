@@ -1,6 +1,7 @@
-"""Package installation logic.
+"""Package and tool installation.
 
-Includes apt packages, npm tools, locale configuration, and Quarto installation.
+Includes apt packages, uv tools, npm tools, Claude Code, locale configuration,
+and Quarto installation.
 """
 
 import json
@@ -11,13 +12,16 @@ import tempfile
 import urllib.error
 import urllib.request
 
-from machine_setup.config import SetupConfig
+from machine_setup.presets import SetupConfig
 from machine_setup.utils import command_exists, run, sudo_prefix
 
 logger = logging.getLogger("machine_setup")
 
 # Locale configuration
 LOCALE = "en_US.UTF-8"
+
+# Claude Code installer
+CLAUDE_INSTALL_URL = "https://claude.ai/install.sh"
 
 
 def is_package_installed(package: str) -> bool:
@@ -178,6 +182,26 @@ def setup_locale() -> None:
     generate_locale(LOCALE)
 
 
+# --- uv tools ---
+
+
+def install_uv_tools(tools: list[str]) -> None:
+    """Install Python tools using uv tool install."""
+    if not tools:
+        logger.info("No uv tools to install")
+        return
+
+    if not command_exists("uv"):
+        logger.warning("uv not found; skipping uv tool installation")
+        return
+
+    for tool in tools:
+        logger.info("Installing %s via uv tool...", tool)
+        result = run(["uv", "tool", "install", tool], check=False)
+        if result.returncode != 0:
+            logger.warning("uv tool install failed for %s", tool)
+
+
 # --- npm tools ---
 
 
@@ -197,3 +221,38 @@ def install_npm_tools(tools: list[str]) -> None:
         result = run([*sudo, "npm", "install", "-g", tool], check=False)
         if result.returncode != 0:
             logger.warning("npm tool install failed for %s", tool)
+
+
+# --- Claude Code ---
+
+
+def install_claude_code() -> None:
+    """Install Claude Code CLI via native binary installer."""
+    if command_exists("claude"):
+        logger.info("Claude Code already installed")
+        return
+
+    logger.info("Installing Claude Code CLI...")
+
+    try:
+        curl = subprocess.run(
+            ["curl", "-fsSL", "--max-time", "30", CLAUDE_INSTALL_URL],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        subprocess.run(
+            ["bash"],
+            input=curl.stdout,
+            text=True,
+            check=True,
+        )
+
+        logger.info("Claude Code installed successfully")
+        logger.info(
+            "You may need to restart your shell or run `source ~/.bashrc` "
+            "for the `claude` command to be available"
+        )
+    except subprocess.CalledProcessError as error:
+        logger.warning("Failed to install Claude Code: %s", error)

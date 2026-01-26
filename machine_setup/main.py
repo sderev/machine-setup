@@ -6,17 +6,23 @@ from pathlib import Path
 
 import click
 
-from machine_setup.config import Preset, SetupConfig
-from machine_setup.dev_env import setup_ipython_math_profile, setup_shell, setup_vim
+from machine_setup.app_setup import setup_ipython_math_profile, setup_shell, setup_vim
 from machine_setup.dotfiles import (
     clone_dotfiles,
     create_repos_structure,
     setup_scripts_symlink,
     stow_dotfiles,
 )
-from machine_setup.packages import install_npm_tools, install_packages, install_quarto, setup_locale
+from machine_setup.installers import (
+    install_claude_code,
+    install_npm_tools,
+    install_packages,
+    install_quarto,
+    install_uv_tools,
+    setup_locale,
+)
+from machine_setup.presets import Preset, SetupConfig
 from machine_setup.secrets import setup_ssh
-from machine_setup.tools import install_claude_code, install_uv_tools
 from machine_setup.utils import setup_logging
 from machine_setup.windows import setup_windows_configs
 

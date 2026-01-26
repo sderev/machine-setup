@@ -1,8 +1,8 @@
-"""Tests for config module."""
+"""Tests for presets module."""
 
 import pytest
 
-from machine_setup.config import (
+from machine_setup.presets import (
     NPM_TOOLS_DEV,
     NPM_TOOLS_FULL,
     NPM_TOOLS_MINIMAL,
