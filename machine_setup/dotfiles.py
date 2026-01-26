@@ -161,3 +161,18 @@ def setup_scripts_symlink(dotfiles_path: Path, home: Path) -> None:
 
     scripts_dst.symlink_to(scripts_src)
     logger.info("Created symlink: %s -> %s", scripts_dst, scripts_src)
+
+
+def rebuild_bat_cache() -> None:
+    """Rebuild bat cache to pick up custom themes."""
+    if not command_exists("bat") and not command_exists("batcat"):
+        logger.debug("bat not found, skipping cache rebuild")
+        return
+
+    bat_cmd = "bat" if command_exists("bat") else "batcat"
+    logger.info("Rebuilding bat cache for custom themes...")
+    result = run([bat_cmd, "cache", "--build"], check=False, capture=True)
+    if result.returncode != 0:
+        logger.warning("Failed to rebuild bat cache: %s", result.stderr)
+    else:
+        logger.info("bat cache rebuilt successfully")

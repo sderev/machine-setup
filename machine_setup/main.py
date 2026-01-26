@@ -10,6 +10,7 @@ from machine_setup.app_setup import setup_ipython_math_profile, setup_shell, set
 from machine_setup.dotfiles import (
     clone_dotfiles,
     create_repos_structure,
+    rebuild_bat_cache,
     setup_scripts_symlink,
     stow_dotfiles,
 )
@@ -125,6 +126,7 @@ def main(
             logger.info("=== Setting up dotfiles ===")
             dotfiles_path = clone_dotfiles(config)
             stow_dotfiles(config, dotfiles_path)
+            rebuild_bat_cache()
             if config.preset in (Preset.DEV, Preset.FULL):
                 setup_scripts_symlink(dotfiles_path, Path(config.home_dir).expanduser())
 
