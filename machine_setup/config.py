@@ -26,7 +26,7 @@ PACKAGES_MINIMAL: list[str] = [
     "stow",
     "sudo",
     "tmux",
-    "vim",
+    "vim-nox",
     "wget",
     "zsh",
 ]
