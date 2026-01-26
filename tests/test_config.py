@@ -44,7 +44,7 @@ class TestSetupConfig:
         config = SetupConfig(preset=Preset.DEV)
         assert config.preset == Preset.DEV
         assert "github.com" in config.dotfiles_repo
-        assert config.dotfiles_dir == "~/.dotfiles_private"
+        assert config.dotfiles_dir == "~/Repos/github.com/sderev/.dotfiles_private"
         assert config.home_dir == "~"
 
     def test_custom_dotfiles_repo(self):

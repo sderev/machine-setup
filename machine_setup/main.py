@@ -7,7 +7,12 @@ from pathlib import Path
 import click
 
 from machine_setup.config import Preset, SetupConfig
-from machine_setup.dotfiles import clone_dotfiles, setup_scripts_symlink, stow_dotfiles
+from machine_setup.dotfiles import (
+    clone_dotfiles,
+    create_repos_structure,
+    setup_scripts_symlink,
+    stow_dotfiles,
+)
 from machine_setup.ipython_setup import setup_ipython_math_profile
 from machine_setup.locale import setup_locale
 from machine_setup.npm_tools import install_npm_tools
@@ -110,6 +115,9 @@ def main(
             if config.preset == Preset.FULL:
                 logger.info("=== Installing Quarto ===")
                 install_quarto()
+
+        logger.info("=== Creating repos directory structure ===")
+        create_repos_structure(Path(config.home_dir).expanduser())
 
         if not skip_dotfiles:
             logger.info("=== Setting up dotfiles ===")

@@ -10,6 +10,28 @@ from machine_setup.utils import command_exists, run
 
 logger = logging.getLogger("machine_setup")
 
+REPOS_SUBDIRS = (
+    "clone",
+    "forks",
+    "sderev",
+)
+
+
+def create_repos_structure(home: Path) -> None:
+    """Create the user's repos directory structure.
+
+    Creates:
+        ~/Repos/github.com/clone/
+        ~/Repos/github.com/forks/
+        ~/Repos/github.com/sderev/
+    """
+    repos_base = home / "Repos" / "github.com"
+    for subdir in REPOS_SUBDIRS:
+        path = repos_base / subdir
+        if not path.exists():
+            logger.info("Creating directory: %s", path)
+            path.mkdir(parents=True)
+
 
 def remove_default_dotfiles(home: Path) -> None:
     """Remove skeleton/default dotfiles that conflict with stow."""

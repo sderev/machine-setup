@@ -145,7 +145,7 @@ class SetupConfig:
 
     preset: Preset
     dotfiles_repo: str = "https://github.com/sderev/.dotfiles_private.git"
-    dotfiles_dir: str = "~/.dotfiles_private"
+    dotfiles_dir: str = "~/Repos/github.com/sderev/.dotfiles_private"
     dotfiles_branch: str = "main"
     home_dir: str = "~"
 
