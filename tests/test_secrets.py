@@ -59,6 +59,63 @@ def test_add_ssh_key_to_github_authenticates(monkeypatch, tmp_path: Path) -> Non
 
     assert calls == [
         ["gh", "auth", "status", "--hostname", "github.com"],
-        ["gh", "auth", "login", "--hostname", "github.com", "--git-protocol", "https"],
+        [
+            "gh",
+            "auth",
+            "login",
+            "--hostname",
+            "github.com",
+            "--git-protocol",
+            "https",
+            "--scopes",
+            "admin:public_key",
+        ],
+        ["gh", "ssh-key", "add", str(public_key_path), "--title", "machine-setup"],
+    ]
+
+
+def test_add_ssh_key_to_github_refreshes_scopes_on_404(monkeypatch, tmp_path: Path) -> None:
+    """Refreshes auth scopes when GitHub returns 404."""
+    ssh_dir = tmp_path / ".ssh"
+    ssh_dir.mkdir()
+    public_key_path = ssh_dir / "id_ed25519.pub"
+    public_key_path.write_text("ssh-ed25519 AAAA\n")
+
+    monkeypatch.setattr(secrets.Path, "home", lambda *args, **kwargs: tmp_path)
+    monkeypatch.setattr(secrets, "command_exists", lambda cmd: True)
+
+    calls: list[list[str]] = []
+    add_calls = 0
+
+    def fake_run(cmd: list[str], *, check: bool = True, capture: bool = False, env=None):
+        nonlocal add_calls
+        calls.append(cmd)
+        if cmd[:3] == ["gh", "auth", "status"]:
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+        if cmd[:3] == ["gh", "ssh-key", "add"]:
+            add_calls += 1
+            if add_calls == 1:
+                return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="HTTP 404")
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+        if cmd[:3] == ["gh", "auth", "refresh"]:
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(secrets, "run", fake_run)
+
+    assert secrets.add_ssh_key_to_github() is True
+
+    assert calls == [
+        ["gh", "auth", "status", "--hostname", "github.com"],
+        ["gh", "ssh-key", "add", str(public_key_path), "--title", "machine-setup"],
+        [
+            "gh",
+            "auth",
+            "refresh",
+            "--hostname",
+            "github.com",
+            "--scopes",
+            "admin:public_key",
+        ],
         ["gh", "ssh-key", "add", str(public_key_path), "--title", "machine-setup"],
     ]

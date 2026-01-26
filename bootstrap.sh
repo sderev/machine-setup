@@ -70,7 +70,7 @@ apt-get install -y curl ca-certificates python3-minimal gh
 
 # Authenticate with GitHub early (so prompts happen upfront)
 if ! run_as_user gh auth status --hostname github.com >/dev/null 2>&1; then
-	run_as_user gh auth login --hostname github.com --git-protocol https
+	run_as_user gh auth login --hostname github.com --git-protocol https --scopes admin:public_key
 fi
 run_as_user gh auth setup-git
 

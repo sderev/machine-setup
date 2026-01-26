@@ -81,7 +81,17 @@ def add_ssh_key_to_github(key_name: str = "id_ed25519", title: str = "machine-se
     if result.returncode != 0:
         logger.info("Authenticating to GitHub via device flow...")
         login_result = run(
-            ["gh", "auth", "login", "--hostname", "github.com", "--git-protocol", "https"],
+            [
+                "gh",
+                "auth",
+                "login",
+                "--hostname",
+                "github.com",
+                "--git-protocol",
+                "https",
+                "--scopes",
+                "admin:public_key",
+            ],
             check=False,
         )
         if login_result.returncode != 0:
@@ -100,6 +110,37 @@ def add_ssh_key_to_github(key_name: str = "id_ed25519", title: str = "machine-se
         duplicate_hint = f"{result.stdout}{result.stderr}".lower()
         if "already" in duplicate_hint:
             logger.info("SSH key already registered with GitHub")
+            return True
+        if "http 404" in duplicate_hint or "status 404" in duplicate_hint:
+            logger.info("Refreshing GitHub auth scopes to include admin:public_key...")
+            refresh_result = run(
+                [
+                    "gh",
+                    "auth",
+                    "refresh",
+                    "--hostname",
+                    "github.com",
+                    "--scopes",
+                    "admin:public_key",
+                ],
+                check=False,
+            )
+            if refresh_result.returncode != 0:
+                logger.warning("Failed to refresh GitHub auth scopes")
+                return False
+            result = run(
+                ["gh", "ssh-key", "add", str(public_key_path), "--title", title],
+                check=False,
+                capture=True,
+            )
+            if result.returncode != 0:
+                duplicate_hint = f"{result.stdout}{result.stderr}".lower()
+                if "already" in duplicate_hint:
+                    logger.info("SSH key already registered with GitHub")
+                    return True
+                logger.warning("Failed to add SSH key to GitHub: %s", result.stderr.strip())
+                return False
+            logger.info("SSH key added to GitHub")
             return True
         logger.warning("Failed to add SSH key to GitHub: %s", result.stderr.strip())
         return False
