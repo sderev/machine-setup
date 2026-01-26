@@ -66,7 +66,13 @@ SOURCES
 configure_apt_sources
 
 apt-get update
-apt-get install -y curl ca-certificates python3-minimal
+apt-get install -y curl ca-certificates python3-minimal gh
+
+# Authenticate with GitHub early (so prompts happen upfront)
+if ! run_as_user gh auth status --hostname github.com >/dev/null 2>&1; then
+	run_as_user gh auth login --hostname github.com --git-protocol https
+fi
+run_as_user gh auth setup-git
 
 # Set timezone to Europe/Paris
 ln -sf /usr/share/zoneinfo/Europe/Paris /etc/localtime
