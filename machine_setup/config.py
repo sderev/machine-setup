@@ -78,7 +78,7 @@ PACKAGES_FULL: list[str] = [
     "img2pdf",
     "latexmk",
     "libimage-exiftool-perl",
-    "love",
+    # "love",  # Disabled: Debian sid package has broken postinst (missing man page)
     "msmtp",
     "msmtp-mta",
     "ncal",
