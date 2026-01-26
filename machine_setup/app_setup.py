@@ -100,7 +100,40 @@ PYPROJECT_TOML = dedent("""\
 WRAPPER_SCRIPT = dedent("""\
     #!/bin/bash
     cd "$HOME/.local/share/ipython-math"
+    export IPYTHONDIR="$HOME/.local/share/ipython-math"
     exec uv run ipython --profile=math "$@"
+""")
+
+IPYTHON_CONFIG = dedent("""\
+    from traitlets.config import get_config
+
+    c = get_config()
+
+    c.TerminalInteractiveShell.editing_mode = "vi"
+    c.InteractiveShell.editor = "vim"
+    c.InteractiveShell.colors = "NoColor"
+""")
+
+STARTUP_IMPORTS = dedent("""\
+    # Auto-import math/science packages for ipython-math profile
+    import math
+    import cmath
+    import statistics
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import scipy as sp
+    from scipy import linalg
+    import sympy as sym
+    from sympy import symbols, solve, diff, integrate, simplify, expand, factor
+    import sklearn
+
+    # SymPy pretty printing
+    sym.init_printing()
+
+    print("Imported: math, cmath, statistics, np, pd, plt, sns, sp (scipy), sym (sympy), sklearn")
+    print("SymPy helpers: symbols, solve, diff, integrate, simplify, expand, factor")
 """)
 
 
@@ -129,6 +162,22 @@ def setup_ipython_math_profile() -> None:
     if result.returncode != 0:
         logger.warning("Failed to sync ipython-math environment: %s", result.stderr)
         return
+
+    # Create IPython profile directory and config
+    profile_dir = IPYTHON_MATH_DIR / "profile_math"
+    profile_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create ipython_config.py with vi mode and settings
+    config_file = profile_dir / "ipython_config.py"
+    config_file.write_text(IPYTHON_CONFIG)
+    logger.info("Created config %s", config_file)
+
+    # Create startup script for auto-imports
+    startup_dir = profile_dir / "startup"
+    startup_dir.mkdir(parents=True, exist_ok=True)
+    startup_script = startup_dir / "00-imports.py"
+    startup_script.write_text(STARTUP_IMPORTS)
+    logger.info("Created startup script %s", startup_script)
 
     IPYTHON_MATH_BIN.parent.mkdir(parents=True, exist_ok=True)
     IPYTHON_MATH_BIN.write_text(WRAPPER_SCRIPT)

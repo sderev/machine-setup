@@ -29,7 +29,7 @@ def test_setup_ipython_math_profile_skips_when_uv_missing(monkeypatch, caplog) -
 
 
 def test_setup_ipython_math_profile_creates_files(monkeypatch, tmp_path, caplog) -> None:
-    """Create pyproject.toml and wrapper script."""
+    """Create pyproject.toml, startup script, and wrapper script."""
     math_dir = tmp_path / "ipython-math"
     bin_dir = tmp_path / "bin"
     wrapper = bin_dir / "ipython-math"
@@ -49,6 +49,18 @@ def test_setup_ipython_math_profile_creates_files(monkeypatch, tmp_path, caplog)
     assert (math_dir / "pyproject.toml").exists()
     assert wrapper.exists()
     assert wrapper.stat().st_mode & 0o755 == 0o755
+    # Verify IPython profile config is created with vi mode
+    config_file = math_dir / "profile_math" / "ipython_config.py"
+    assert config_file.exists()
+    config_content = config_file.read_text()
+    assert 'editing_mode = "vi"' in config_content
+    # Verify IPython profile startup script is created
+    startup_script = math_dir / "profile_math" / "startup" / "00-imports.py"
+    assert startup_script.exists()
+    startup_content = startup_script.read_text()
+    assert "import math" in startup_content
+    assert "import numpy as np" in startup_content
+    assert "import pandas as pd" in startup_content
     assert "IPython math profile setup complete" in caplog.text
 
 
