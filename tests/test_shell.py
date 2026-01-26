@@ -107,6 +107,28 @@ class TestSetDefaultShellZsh:
             )
 
     @patch("machine_setup.shell.logger")
+    def test_etc_shells_not_found(self, mock_logger):
+        """Test early return when /etc/shells does not exist."""
+        zsh_path = "/usr/bin/zsh"
+
+        with (
+            patch("machine_setup.shell.get_current_shell", return_value="/bin/bash"),
+            patch("machine_setup.shell.get_zsh_path", return_value=zsh_path),
+            patch("machine_setup.shell.sudo_prefix", return_value=["sudo"]),
+            patch.object(Path, "exists", return_value=False),
+            patch("machine_setup.shell.run") as mock_run,
+            patch("machine_setup.shell.pwd.getpwuid") as mock_getpwuid,
+        ):
+            mock_pw = Mock()
+            mock_pw.pw_name = "testuser"
+            mock_getpwuid.return_value = mock_pw
+
+            set_default_shell_zsh()
+
+            chsh_args = [call[0][0] for call in mock_run.call_args_list]
+            assert ["sudo", "chsh", "-s", zsh_path, "testuser"] in chsh_args
+
+    @patch("machine_setup.shell.logger")
     def test_does_not_add_zsh_to_shells_when_present(self, mock_logger):
         """Test that zsh is not added to /etc/shells when already present."""
         zsh_path = "/usr/bin/zsh"
