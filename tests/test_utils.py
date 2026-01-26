@@ -1,9 +1,11 @@
 """Tests for utils module."""
 
+import logging
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
-from machine_setup.utils import command_exists, ensure_dir, path_exists
+from machine_setup.utils import ColorFormatter, command_exists, ensure_dir, path_exists
 
 
 class TestCommandExists:
@@ -73,3 +75,106 @@ class TestEnsureDir:
         with patch.object(Path, "expanduser", return_value=tmp_path / "home"):
             result = ensure_dir("~/test")
             assert isinstance(result, Path)
+
+
+class TestColorFormatter:
+    """Tests for ColorFormatter class."""
+
+    def test_info_level_color(self):
+        """Test that INFO level is colored green."""
+        formatter = ColorFormatter()
+        record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="test message",
+            args=(),
+            exc_info=None,
+        )
+        formatted = formatter.format(record)
+        assert "INFO:" in formatted
+        assert "test message" in formatted
+
+    def test_warning_level_color(self):
+        """Test that WARNING level is colored yellow."""
+        formatter = ColorFormatter()
+        record = logging.LogRecord(
+            name="test",
+            level=logging.WARNING,
+            pathname="",
+            lineno=0,
+            msg="test message",
+            args=(),
+            exc_info=None,
+        )
+        formatted = formatter.format(record)
+        assert "WARNING:" in formatted
+        assert "test message" in formatted
+
+    def test_error_level_color(self):
+        """Test that ERROR level is colored red."""
+        formatter = ColorFormatter()
+        record = logging.LogRecord(
+            name="test",
+            level=logging.ERROR,
+            pathname="",
+            lineno=0,
+            msg="test message",
+            args=(),
+            exc_info=None,
+        )
+        formatted = formatter.format(record)
+        assert "ERROR:" in formatted
+
+    def test_debug_level_color(self):
+        """Test that DEBUG level is colored gray."""
+        formatter = ColorFormatter()
+        record = logging.LogRecord(
+            name="test",
+            level=logging.DEBUG,
+            pathname="",
+            lineno=0,
+            msg="test message",
+            args=(),
+            exc_info=None,
+        )
+        formatted = formatter.format(record)
+        assert "DEBUG:" in formatted
+        assert "test message" in formatted
+
+    def test_section_header_bold(self):
+        """Test that section headers are bold."""
+        formatter = ColorFormatter()
+        record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="=== Test Section ===",
+            args=(),
+            exc_info=None,
+        )
+        formatted = formatter.format(record)
+        assert "=== Test Section ===" in formatted
+        assert formatted.startswith("\n")
+
+    def test_exception_handling(self):
+        """Test that exceptions are formatted correctly."""
+        formatter = ColorFormatter()
+        try:
+            raise ValueError("test exception")
+        except Exception:
+            exc_info = sys.exc_info()
+            record = logging.LogRecord(
+                name="test",
+                level=logging.ERROR,
+                pathname="",
+                lineno=0,
+                msg="error",
+                args=(),
+                exc_info=exc_info,
+            )
+            formatted = formatter.format(record)
+            assert "error" in formatted
+            assert "ValueError" in formatted or "test exception" in formatted
