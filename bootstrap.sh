@@ -88,4 +88,4 @@ cd "$script_dir"
 
 run_as_user "$user_uv" venv --clear
 run_as_user "$user_uv" pip install -e .
-run_as_user "$user_uv" run machine-setup --preset "$PRESET" "${extra_args[@]}"
+run_as_user "$user_uv" run machine-setup run --preset "$PRESET" "${extra_args[@]}"

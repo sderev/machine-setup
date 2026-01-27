@@ -22,6 +22,7 @@ from machine_setup.installers import (
     install_uv_tools,
     setup_locale,
 )
+from machine_setup.keys import keys_cli
 from machine_setup.presets import Preset, SetupConfig
 from machine_setup.secrets import setup_gpg, setup_ssh
 from machine_setup.utils import setup_logging
@@ -30,7 +31,25 @@ from machine_setup.windows import setup_windows_configs
 logger = logging.getLogger("machine_setup")
 
 
-@click.command()
+@click.group(invoke_without_command=True)
+@click.pass_context
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    help="Enable verbose output",
+)
+def main(ctx: click.Context, verbose: bool) -> None:
+    """Personal development environment bootstrap."""
+    ctx.ensure_object(dict)
+    ctx.obj["verbose"] = verbose
+
+    # If no subcommand, show help
+    if ctx.invoked_subcommand is None:
+        click.echo(ctx.get_help())
+
+
+@main.command(name="run")
 @click.option(
     "--preset",
     "-p",
@@ -94,7 +113,9 @@ logger = logging.getLogger("machine_setup")
     is_flag=True,
     help="Enable verbose output",
 )
-def main(
+@click.pass_context
+def run_setup(
+    ctx: click.Context,
     preset: str,
     dotfiles_repo: str,
     dotfiles_branch: str,
@@ -107,7 +128,9 @@ def main(
     skip_windows: bool,
     verbose: bool,
 ) -> None:
-    """Personal development environment bootstrap."""
+    """Run the full machine setup."""
+    # Use verbose from parent context if not set locally
+    verbose = verbose or ctx.obj.get("verbose", False)
     setup_logging(verbose)
 
     preset_enum = Preset(preset)
@@ -178,6 +201,10 @@ def main(
         if verbose:
             raise
         sys.exit(1)
+
+
+# Add keys subcommand group
+main.add_command(keys_cli)
 
 
 if __name__ == "__main__":
