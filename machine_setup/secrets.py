@@ -1,11 +1,23 @@
-"""Optional SSH key generation and GitHub registration."""
+"""SSH key generation and GitHub registration."""
 
 import logging
+import socket
+from datetime import datetime
 from pathlib import Path
 
 from machine_setup.utils import command_exists, run
 
 logger = logging.getLogger("machine_setup")
+
+
+def generate_key_name() -> str:
+    """Generate a descriptive key name with hostname and date.
+
+    Format: machine-setup-{hostname}-{YYYYMMDD}
+    """
+    hostname = socket.gethostname()
+    date_str = datetime.now().strftime("%Y%m%d")
+    return f"machine-setup-{hostname}-{date_str}"
 
 
 def generate_ssh_key(key_name: str = "id_ed25519") -> bool:
@@ -60,23 +72,13 @@ def generate_ssh_key(key_name: str = "id_ed25519") -> bool:
         logger.error("Failed to generate SSH key")
         return False
 
+    private_key_path.chmod(0o600)
     logger.info("SSH key generated at %s", private_key_path)
     return True
 
 
-def add_ssh_key_to_github(key_name: str = "id_ed25519", title: str = "machine-setup") -> bool:
-    """Add SSH public key to GitHub using gh CLI."""
-    if not command_exists("gh"):
-        logger.warning("gh CLI not found, cannot add SSH key to GitHub")
-        return False
-
-    public_key_path = Path.home() / ".ssh" / f"{key_name}.pub"
-
-    if not public_key_path.exists():
-        logger.warning("SSH public key not found at %s", public_key_path)
-        return False
-
-    # Check if gh is authenticated
+def _ensure_gh_authenticated(scopes: str = "admin:public_key") -> bool:
+    """Ensure gh CLI is authenticated with required scopes."""
     result = run(["gh", "auth", "status", "--hostname", "github.com"], check=False, capture=True)
     if result.returncode != 0:
         logger.info("Authenticating to GitHub via device flow...")
@@ -90,15 +92,54 @@ def add_ssh_key_to_github(key_name: str = "id_ed25519", title: str = "machine-se
                 "--git-protocol",
                 "https",
                 "--scopes",
-                "admin:public_key",
+                scopes,
             ],
             check=False,
         )
         if login_result.returncode != 0:
-            logger.warning("gh CLI authentication failed, cannot add SSH key")
+            logger.warning("gh CLI authentication failed")
             return False
+    return True
 
-    logger.info("Adding SSH key to GitHub...")
+
+def _refresh_gh_scopes(scopes: str) -> bool:
+    """Refresh GitHub auth scopes."""
+    logger.info("Refreshing GitHub auth scopes to include %s...", scopes)
+    refresh_result = run(
+        [
+            "gh",
+            "auth",
+            "refresh",
+            "--hostname",
+            "github.com",
+            "--scopes",
+            scopes,
+        ],
+        check=False,
+    )
+    return refresh_result.returncode == 0
+
+
+def add_ssh_key_to_github(key_name: str = "id_ed25519", title: str | None = None) -> bool:
+    """Add SSH public key to GitHub using gh CLI."""
+    if not command_exists("gh"):
+        logger.warning("gh CLI not found, cannot add SSH key to GitHub")
+        return False
+
+    public_key_path = Path.home() / ".ssh" / f"{key_name}.pub"
+
+    if not public_key_path.exists():
+        logger.warning("SSH public key not found at %s", public_key_path)
+        return False
+
+    if not _ensure_gh_authenticated("admin:public_key"):
+        logger.warning("Cannot add SSH key without GitHub authentication")
+        return False
+
+    if title is None:
+        title = generate_key_name()
+
+    logger.info("Adding SSH key to GitHub with title '%s'...", title)
     result = run(
         ["gh", "ssh-key", "add", str(public_key_path), "--title", title],
         check=False,
@@ -112,20 +153,7 @@ def add_ssh_key_to_github(key_name: str = "id_ed25519", title: str = "machine-se
             logger.info("SSH key already registered with GitHub")
             return True
         if "http 404" in duplicate_hint or "status 404" in duplicate_hint:
-            logger.info("Refreshing GitHub auth scopes to include admin:public_key...")
-            refresh_result = run(
-                [
-                    "gh",
-                    "auth",
-                    "refresh",
-                    "--hostname",
-                    "github.com",
-                    "--scopes",
-                    "admin:public_key",
-                ],
-                check=False,
-            )
-            if refresh_result.returncode != 0:
+            if not _refresh_gh_scopes("admin:public_key"):
                 logger.warning("Failed to refresh GitHub auth scopes")
                 return False
             result = run(
@@ -156,4 +184,5 @@ def setup_ssh(generate: bool = False) -> None:
         return
 
     if generate_ssh_key():
-        add_ssh_key_to_github()
+        key_title = generate_key_name()
+        add_ssh_key_to_github(title=key_title)
