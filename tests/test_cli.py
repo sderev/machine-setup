@@ -41,6 +41,8 @@ class TestCLI:
             "--dotfiles-repo",
             "--dotfiles-branch",
             "--generate-ssh-key",
+            "--generate-gpg-key",
+            "--gpg-expiry-days",
             "--skip-packages",
             "--skip-dotfiles",
             "--skip-vim",

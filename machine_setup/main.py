@@ -23,7 +23,7 @@ from machine_setup.installers import (
     setup_locale,
 )
 from machine_setup.presets import Preset, SetupConfig
-from machine_setup.secrets import setup_ssh
+from machine_setup.secrets import setup_gpg, setup_ssh
 from machine_setup.utils import setup_logging
 from machine_setup.windows import setup_windows_configs
 
@@ -56,6 +56,19 @@ logger = logging.getLogger("machine_setup")
     help="Generate SSH key and add to GitHub",
 )
 @click.option(
+    "--generate-gpg-key",
+    "gpg_email",
+    type=str,
+    default=None,
+    help="Generate GPG key with this email and add to GitHub",
+)
+@click.option(
+    "--gpg-expiry-days",
+    type=int,
+    default=90,
+    help="GPG key expiry in days (default: 90)",
+)
+@click.option(
     "--skip-packages",
     is_flag=True,
     help="Skip package installation",
@@ -86,6 +99,8 @@ def main(
     dotfiles_repo: str,
     dotfiles_branch: str,
     generate_ssh_key: bool,
+    gpg_email: str | None,
+    gpg_expiry_days: int,
     skip_packages: bool,
     skip_dotfiles: bool,
     skip_vim: bool,
@@ -137,6 +152,10 @@ def main(
         if generate_ssh_key:
             logger.info("=== Setting up SSH key ===")
             setup_ssh(generate=generate_ssh_key)
+
+        if gpg_email:
+            logger.info("=== Setting up GPG key ===")
+            setup_gpg(email=gpg_email, expiry_days=gpg_expiry_days)
 
         if not skip_vim:
             logger.info("=== Setting up vim ===")

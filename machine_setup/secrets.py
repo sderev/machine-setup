@@ -1,10 +1,14 @@
-"""SSH key generation and GitHub registration."""
+"""SSH and GPG key generation and GitHub registration."""
 
 import logging
+import os
 import socket
+import tempfile
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from machine_setup.keys import KeyRecord, KeyRegistry
 from machine_setup.utils import command_exists, run
 
 logger = logging.getLogger("machine_setup")
@@ -177,6 +181,164 @@ def add_ssh_key_to_github(key_name: str = "id_ed25519", title: str | None = None
     return True
 
 
+@dataclass
+class GpgKeyResult:
+    """Result of GPG key generation."""
+
+    fingerprint: str
+    key_name: str
+
+
+def generate_gpg_key(email: str, expiry_days: int = 90) -> GpgKeyResult | None:
+    """Generate a new GPG key with expiry.
+
+    Returns a GpgKeyResult with fingerprint and key_name on success, None on failure.
+    """
+    if not command_exists("gpg"):
+        logger.warning("gpg not found, cannot generate GPG key")
+        return None
+
+    key_name = generate_key_name()
+
+    # GPG batch configuration for unattended key generation
+    # Name-Real uses the same format as SSH key titles for consistency
+    gpg_config = f"""
+Key-Type: eddsa
+Key-Curve: ed25519
+Key-Usage: sign
+Subkey-Type: ecdh
+Subkey-Curve: cv25519
+Subkey-Usage: encrypt
+Name-Real: {key_name}
+Name-Email: {email}
+Expire-Date: {expiry_days}d
+%no-protection
+%commit
+"""
+
+    logger.info("Generating new GPG key (expires in %d days)...", expiry_days)
+    logger.warning("GPG key will be created WITHOUT a passphrase for automation")
+
+    # Write config to temp file
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".gpg-gen", delete=False) as f:
+        f.write(gpg_config)
+        config_path = f.name
+
+    try:
+        # Generate key with batch mode
+        env = os.environ.copy()
+        # Prevent pinentry from popping up
+        env["GPG_TTY"] = ""
+
+        result = run(
+            ["gpg", "--batch", "--generate-key", config_path],
+            check=False,
+            capture=True,
+            env=env,
+        )
+
+        if result.returncode != 0:
+            logger.error("Failed to generate GPG key: %s", result.stderr.strip())
+            return None
+
+        # Get the fingerprint of the newly created key by looking for the key name
+        # Using key_name instead of email avoids returning an older key when
+        # multiple keys share the same email
+        list_result = run(
+            ["gpg", "--list-keys", "--with-colons", key_name],
+            check=False,
+            capture=True,
+        )
+
+        if list_result.returncode != 0:
+            logger.error("Failed to list GPG keys for %s", key_name)
+            return None
+
+        # Parse output to find fingerprint (fpr line)
+        for line in list_result.stdout.split("\n"):
+            if line.startswith("fpr:"):
+                fingerprint = line.split(":")[9]
+                logger.info("GPG key generated with fingerprint: %s", fingerprint)
+                return GpgKeyResult(fingerprint=fingerprint, key_name=key_name)
+
+        logger.error("Could not find fingerprint for newly generated key")
+        return None
+
+    finally:
+        Path(config_path).unlink(missing_ok=True)
+
+
+def add_gpg_key_to_github(fingerprint: str) -> bool:
+    """Add GPG public key to GitHub using gh CLI."""
+    if not command_exists("gh"):
+        logger.warning("gh CLI not found, cannot add GPG key to GitHub")
+        return False
+
+    if not command_exists("gpg"):
+        logger.warning("gpg not found, cannot export GPG key")
+        return False
+
+    if not _ensure_gh_authenticated("admin:gpg_key"):
+        logger.warning("Cannot add GPG key without GitHub authentication")
+        return False
+
+    # Export the public key in armor format
+    export_result = run(
+        ["gpg", "--armor", "--export", fingerprint],
+        check=False,
+        capture=True,
+    )
+
+    if export_result.returncode != 0 or not export_result.stdout.strip():
+        logger.error("Failed to export GPG public key")
+        return False
+
+    # Write to temp file for gh CLI
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".gpg", delete=False) as f:
+        f.write(export_result.stdout)
+        key_path = f.name
+
+    try:
+        logger.info("Adding GPG key to GitHub...")
+        result = run(
+            ["gh", "gpg-key", "add", key_path],
+            check=False,
+            capture=True,
+        )
+
+        if result.returncode != 0:
+            error_output = f"{result.stdout}{result.stderr}".lower()
+            if "already" in error_output:
+                logger.info("GPG key already registered with GitHub")
+                return True
+            if "http 404" in error_output or "status 404" in error_output:
+                if not _refresh_gh_scopes("admin:gpg_key"):
+                    logger.warning("Failed to refresh GitHub auth scopes")
+                    return False
+                result = run(
+                    ["gh", "gpg-key", "add", key_path],
+                    check=False,
+                    capture=True,
+                )
+                if result.returncode != 0:
+                    error_output = f"{result.stdout}{result.stderr}".lower()
+                    if "already" in error_output:
+                        logger.info("GPG key already registered with GitHub")
+                        return True
+                    logger.warning("Failed to add GPG key to GitHub: %s", result.stderr.strip())
+                    return False
+                logger.info("GPG key added to GitHub")
+                return True
+            logger.warning("Failed to add GPG key to GitHub: %s", result.stderr.strip())
+            return False
+
+        logger.info("GPG key added to GitHub")
+        return True
+
+    finally:
+        Path(key_path).unlink(missing_ok=True)
+
+
 def setup_ssh(generate: bool = False) -> None:
     """Setup SSH key optionally."""
     if not generate:
@@ -186,3 +348,19 @@ def setup_ssh(generate: bool = False) -> None:
     if generate_ssh_key():
         key_title = generate_key_name()
         add_ssh_key_to_github(title=key_title)
+
+
+def setup_gpg(email: str, expiry_days: int = 90) -> None:
+    """Setup GPG key with the given email."""
+    gpg_result = generate_gpg_key(email, expiry_days=expiry_days)
+    if gpg_result and add_gpg_key_to_github(gpg_result.fingerprint):
+        registry = KeyRegistry()
+        registry.add(
+            KeyRecord(
+                key_type="gpg",
+                fingerprint=gpg_result.fingerprint,
+                title=gpg_result.key_name,
+                created_at=datetime.now().isoformat(),
+            )
+        )
+        logger.info("GPG key recorded in registry")
