@@ -452,3 +452,117 @@ class TestSetupGpg:
         assert keys[0].key_type == "gpg"
         assert keys[0].fingerprint == "FINGERPRINT123"
         assert keys[0].title == "machine-setup-test-20260127"
+
+
+class TestDuplicateKeyBehavior:
+    """Tests documenting behavior when adding duplicate keys.
+
+    Same-day key regeneration on the same hostname produces identical titles
+    (machine-setup-{hostname}-{YYYYMMDD}). This suite documents what happens.
+    """
+
+    def test_github_rejects_duplicate_key_content(self, monkeypatch, tmp_path: Path) -> None:
+        """GitHub rejects uploading the same key content twice.
+
+        When the same public key is uploaded again (even with different title),
+        GitHub returns "already exists" error. The code handles this gracefully
+        by returning True (idempotent success).
+        """
+        ssh_dir = tmp_path / ".ssh"
+        ssh_dir.mkdir()
+        public_key_path = ssh_dir / "id_ed25519.pub"
+        public_key_path.write_text("ssh-ed25519 AAAA\n")
+
+        monkeypatch.setattr(secrets.Path, "home", lambda *args, **kwargs: tmp_path)
+        monkeypatch.setattr(secrets, "command_exists", lambda cmd: True)
+
+        def fake_run(cmd: list[str], *, check: bool = True, capture: bool = False, env=None):
+            if cmd[:3] == ["gh", "auth", "status"]:
+                return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+            if cmd[:3] == ["gh", "ssh-key", "add"]:
+                # GitHub returns this error when key content already exists
+                return subprocess.CompletedProcess(
+                    cmd, 1, stdout="", stderr="key is already in use"
+                )
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+        monkeypatch.setattr(secrets, "run", fake_run)
+
+        # Same key content uploaded again succeeds (idempotent)
+        result = secrets.add_ssh_key_to_github(title="machine-setup-host-20260127")
+        assert result is True
+
+    def test_github_allows_duplicate_titles_different_keys(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        """GitHub allows multiple keys with the same title but different content.
+
+        If someone regenerates their SSH key (deletes local key, creates new one)
+        and uploads on the same day, GitHub accepts it because the key content
+        is different. Both keys will exist on GitHub with identical titles.
+
+        This is acceptable behavior: the old key is orphaned but not harmful.
+        Users can clean up via `machine-setup keys prune`.
+        """
+        ssh_dir = tmp_path / ".ssh"
+        ssh_dir.mkdir()
+        public_key_path = ssh_dir / "id_ed25519.pub"
+        public_key_path.write_text("ssh-ed25519 NEWKEY\n")
+
+        monkeypatch.setattr(secrets.Path, "home", lambda *args, **kwargs: tmp_path)
+        monkeypatch.setattr(secrets, "command_exists", lambda cmd: True)
+
+        def fake_run(cmd: list[str], *, check: bool = True, capture: bool = False, env=None):
+            if cmd[:3] == ["gh", "auth", "status"]:
+                return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+            if cmd[:3] == ["gh", "ssh-key", "add"]:
+                # GitHub accepts new key content even with duplicate title
+                return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+        monkeypatch.setattr(secrets, "run", fake_run)
+
+        result = secrets.add_ssh_key_to_github(title="machine-setup-host-20260127")
+        assert result is True
+
+    def test_registry_accumulates_duplicate_titles(self, tmp_path: Path) -> None:
+        """Registry does not deduplicate entries with the same title.
+
+        If someone runs setup twice on the same day (regenerating keys),
+        the registry will contain multiple entries with the same title
+        but different fingerprints. This is intentional: each entry
+        represents a distinct key that was uploaded to GitHub.
+
+        The `keys prune` command can clean up orphaned keys.
+        """
+        registry_path = tmp_path / "keys.json"
+        registry = secrets.KeyRegistry(registry_path)
+
+        title = "machine-setup-host-20260127"
+
+        # First key uploaded at 9am
+        registry.add(
+            secrets.KeyRecord(
+                key_type="ssh",
+                fingerprint="SHA256:FIRSTKEY",
+                title=title,
+                created_at="2026-01-27T09:00:00Z",
+            )
+        )
+
+        # User regenerates key, uploads at 2pm with same title
+        registry.add(
+            secrets.KeyRecord(
+                key_type="ssh",
+                fingerprint="SHA256:SECONDKEY",
+                title=title,
+                created_at="2026-01-27T14:00:00Z",
+            )
+        )
+
+        keys = registry.get_all()
+        assert len(keys) == 2
+        assert keys[0].fingerprint == "SHA256:FIRSTKEY"
+        assert keys[1].fingerprint == "SHA256:SECONDKEY"
+        # Both have the same title
+        assert keys[0].title == keys[1].title == title

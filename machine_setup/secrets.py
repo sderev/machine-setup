@@ -81,6 +81,31 @@ def generate_ssh_key(key_name: str = "id_ed25519") -> bool:
     return True
 
 
+def get_ssh_key_fingerprint(key_name: str = "id_ed25519") -> str | None:
+    """Get the fingerprint of an SSH key."""
+    if not command_exists("ssh-keygen"):
+        return None
+
+    public_key_path = Path.home() / ".ssh" / f"{key_name}.pub"
+    if not public_key_path.exists():
+        return None
+
+    result = run(
+        ["ssh-keygen", "-l", "-f", str(public_key_path)],
+        check=False,
+        capture=True,
+    )
+
+    if result.returncode != 0:
+        return None
+
+    # Output format: "256 SHA256:xxx comment (ED25519)"
+    parts = result.stdout.strip().split()
+    if len(parts) >= 2:
+        return parts[1]  # SHA256:xxx
+    return None
+
+
 def _ensure_gh_authenticated(scopes: str = "admin:public_key") -> bool:
     """Ensure gh CLI is authenticated with required scopes."""
     result = run(["gh", "auth", "status", "--hostname", "github.com"], check=False, capture=True)
@@ -347,7 +372,19 @@ def setup_ssh(generate: bool = False) -> None:
 
     if generate_ssh_key():
         key_title = generate_key_name()
-        add_ssh_key_to_github(title=key_title)
+        if add_ssh_key_to_github(title=key_title):
+            fingerprint = get_ssh_key_fingerprint()
+            if fingerprint:
+                registry = KeyRegistry()
+                registry.add(
+                    KeyRecord(
+                        key_type="ssh",
+                        fingerprint=fingerprint,
+                        title=key_title,
+                        created_at=datetime.now().isoformat(),
+                    )
+                )
+                logger.info("SSH key recorded in registry")
 
 
 def setup_gpg(email: str, expiry_days: int = 90) -> None:
