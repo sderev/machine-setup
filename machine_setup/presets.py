@@ -36,7 +36,6 @@ PACKAGES_DEV: list[str] = [
     "ccache",
     "clang",
     "clang-format",
-    "cloc",
     "cmake",
     "cron",
     "dnsutils",

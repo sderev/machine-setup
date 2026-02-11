@@ -256,3 +256,29 @@ def install_claude_code() -> None:
         )
     except subprocess.CalledProcessError as error:
         logger.warning("Failed to install Claude Code: %s", error)
+
+
+# --- Go tools (SCC) ---
+
+
+def install_scc() -> None:
+    """Install SCC (code counter) via go install."""
+    if command_exists("scc"):
+        logger.info("SCC already installed")
+        return
+
+    if not command_exists("go"):
+        logger.warning("Go not found; skipping SCC installation")
+        return
+
+    logger.info("Installing SCC via go install...")
+
+    result = run(
+        ["go", "install", "github.com/boyter/scc/v3@latest"],
+        check=False,
+    )
+
+    if result.returncode != 0:
+        logger.warning("Failed to install SCC")
+    else:
+        logger.info("SCC installed successfully")

@@ -306,7 +306,7 @@ def test_install_claude_code_skips_when_already_installed(monkeypatch, caplog) -
     """Skip installation when claude command already exists."""
     monkeypatch.setattr(installers, "command_exists", lambda cmd: cmd == "claude")
 
-    caplog.set_level(logging.INFO, logger="machine_setup")
+    caplog.set_level("INFO", logger="machine_setup")
     installers.install_claude_code()
 
     assert "Claude Code already installed" in caplog.text
@@ -331,7 +331,7 @@ def test_install_claude_code_runs_installer(monkeypatch, caplog) -> None:
 
     monkeypatch.setattr(subprocess, "run", fake_subprocess_run)
 
-    caplog.set_level(logging.INFO, logger="machine_setup")
+    caplog.set_level("INFO", logger="machine_setup")
     installers.install_claude_code()
 
     assert calls[0] == ["curl", "-fsSL", "--max-time", "30", installers.CLAUDE_INSTALL_URL]
@@ -407,3 +407,68 @@ def test_install_claude_code_handles_curl_timeout(monkeypatch, caplog) -> None:
     installers.install_claude_code()
 
     assert "Failed to install Claude Code" in caplog.text
+
+
+# --- SCC tests ---
+
+
+def test_install_scc_skips_when_installed(monkeypatch, caplog) -> None:
+    """Skip SCC install when command exists."""
+    monkeypatch.setattr(installers, "command_exists", lambda cmd: cmd == "scc")
+
+    caplog.set_level("INFO", logger="machine_setup")
+    installers.install_scc()
+
+    assert "SCC already installed" in caplog.text
+
+
+def test_install_scc_skips_when_go_missing(monkeypatch, caplog) -> None:
+    """Skip SCC install when go is not available."""
+    monkeypatch.setattr(installers, "command_exists", lambda cmd: False)
+
+    caplog.set_level(logging.WARNING, logger="machine_setup")
+    installers.install_scc()
+
+    assert "Go not found; skipping SCC installation" in caplog.text
+
+
+def test_install_scc_installs_via_go(monkeypatch, caplog) -> None:
+    """Install SCC via go install."""
+    calls: list[list[str]] = []
+
+    def fake_command_exists(cmd):
+        return cmd == "go"
+
+    monkeypatch.setattr(installers, "command_exists", fake_command_exists)
+
+    def fake_run(cmd, check=False, capture=False, env=None):
+        calls.append(list(cmd))
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(installers, "run", fake_run)
+
+    caplog.set_level(logging.INFO, logger="machine_setup")
+    installers.install_scc()
+
+    assert calls == [["go", "install", "github.com/boyter/scc/v3@latest"]]
+    assert "Installing SCC via go install" in caplog.text
+    assert "SCC installed successfully" in caplog.text
+
+
+def test_install_scc_handles_failure(monkeypatch, caplog) -> None:
+    """Log warning when SCC installation fails."""
+
+    def fake_command_exists(cmd):
+        return cmd == "go"
+
+    monkeypatch.setattr(installers, "command_exists", fake_command_exists)
+
+    def fake_run(cmd, check=False, capture=False, env=None):
+        return SimpleNamespace(returncode=1)
+
+    monkeypatch.setattr(installers, "run", fake_run)
+
+    caplog.set_level(logging.WARNING, logger="machine_setup")
+    installers.install_scc()
+
+    assert "Failed to install SCC" in caplog.text

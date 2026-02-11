@@ -19,6 +19,7 @@ from machine_setup.installers import (
     install_npm_tools,
     install_packages,
     install_quarto,
+    install_scc,
     install_uv_tools,
     setup_locale,
 )
@@ -153,6 +154,8 @@ def run_setup(
             if config.preset in (Preset.DEV, Preset.FULL):
                 logger.info("=== Installing Claude Code ===")
                 install_claude_code()
+                logger.info("=== Installing SCC ===")
+                install_scc()
             if config.preset == Preset.FULL:
                 logger.info("=== Installing Quarto ===")
                 install_quarto()
