@@ -101,3 +101,7 @@ machine-setup keys prune --older-than 30d --yes
 
 * **SSH keys**: SSH keys do not expire. Use `keys prune` to remove old keys when no longer needed.
 * **GPG keys**: Expire after 90 days by default (configurable via `--gpg-expiry-days`). Regenerate before expiry or use `keys prune` to clean up.
+
+## Windows configuration (WSL only)
+
+When running in WSL, Windows configuration is applied automatically. Use `--skip-windows` to disable it.
