@@ -16,6 +16,7 @@ from machine_setup.dotfiles import (
 )
 from machine_setup.installers import (
     install_claude_code,
+    install_fira_code,
     install_npm_tools,
     install_packages,
     install_quarto,
@@ -156,6 +157,8 @@ def run_setup(
                 install_claude_code()
                 logger.info("=== Installing SCC ===")
                 install_scc()
+                logger.info("=== Installing Fira Code font ===")
+                install_fira_code(skip_windows=skip_windows)
             if config.preset == Preset.FULL:
                 logger.info("=== Installing Quarto ===")
                 install_quarto()

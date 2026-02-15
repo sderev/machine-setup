@@ -70,6 +70,11 @@ def get_windows_startup_folder(username: str) -> Path:
     )
 
 
+def get_windows_fonts_dir(username: str) -> Path:
+    """Get Windows per-user fonts directory path."""
+    return Path(f"/mnt/c/Users/{username}/AppData/Local/Microsoft/Windows/Fonts")
+
+
 def get_windows_terminal_settings(username: str) -> Path:
     """Get Windows Terminal settings.json path."""
     return Path(

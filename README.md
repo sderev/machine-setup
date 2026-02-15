@@ -43,10 +43,11 @@ sudo ./bootstrap.sh [preset] [flags...]
 2. Runs `apt-get upgrade`
 3. Installs `uv` (Python package manager)
 4. Installs apt packages, `uv` tools, npm tools (per preset)
-5. Creates repos directory structure (`~/Repos/github.com/{clone,forks,sderev}/`)
-6. Clones and stows dotfiles from `~/Repos/github.com/sderev/.dotfiles_private`
-7. Generates the `en_US.UTF-8` locale if needed
-8. Sets zsh as default shell; installs vim plugins; creates `ipython-math` environment (dev/full only)
+5. Installs Fira Code font (dev/full presets; on WSL installs to Windows per-user fonts)
+6. Creates repos directory structure (`~/Repos/github.com/{clone,forks,sderev}/`)
+7. Clones and stows dotfiles from `~/Repos/github.com/sderev/.dotfiles_private`
+8. Generates the `en_US.UTF-8` locale if needed
+9. Sets zsh as default shell; installs vim plugins; creates `ipython-math` environment (dev/full only)
 
 ## Key generation
 
@@ -111,5 +112,6 @@ When running in WSL, the following are applied automatically:
 * AutoHotkey keyboard remapping (copied to Windows Startup)
 * Windows Terminal `settings.json`
 * PowerToys (installed via `winget`)
+* Fira Code font (installed to the Windows per-user font directory)
 
 Use `--skip-windows` to disable all Windows configuration.

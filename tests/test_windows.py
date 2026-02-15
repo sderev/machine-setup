@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import call, patch
 
 from machine_setup.windows import (
+    get_windows_fonts_dir,
     get_windows_startup_folder,
     get_windows_terminal_settings,
     get_windows_username,
@@ -222,6 +223,16 @@ class TestGetWindowsStartupFolder:
         expected = Path(
             "/mnt/c/Users/TestUser/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup"
         )
+        assert result == expected
+
+
+class TestGetWindowsFontsDir:
+    """Tests for get_windows_fonts_dir function."""
+
+    def test_returns_correct_path(self):
+        """Test that correct Windows fonts directory path is returned."""
+        result = get_windows_fonts_dir("TestUser")
+        expected = Path("/mnt/c/Users/TestUser/AppData/Local/Microsoft/Windows/Fonts")
         assert result == expected
 
 
