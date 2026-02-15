@@ -2,7 +2,7 @@
 
 import builtins
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 from machine_setup.windows import (
     get_windows_startup_folder,
@@ -316,7 +316,7 @@ class TestSetupWindowsConfigs:
             setup_windows_configs(dotfiles)
             assert "Windows Startup folder not found" in caplog.text
 
-    def test_handles_winget_install_failure(self, tmp_path, monkeypatch, caplog):
+    def test_handles_ahk_winget_install_failure(self, tmp_path, monkeypatch, caplog):
         """Test warning when winget installation fails."""
         import logging
 
@@ -329,10 +329,16 @@ class TestSetupWindowsConfigs:
         ahk_src = ahk_dir / "remapping.ahk"
         ahk_src.write_text("; AHK script")
 
+        def winget_side_effect(package_id):
+            return package_id != "AutoHotkey.AutoHotkey"
+
         with (
             patch("machine_setup.windows.is_wsl", return_value=True),
             patch("machine_setup.windows.get_windows_username", return_value="TestUser"),
-            patch("machine_setup.windows.install_winget_package", return_value=False),
+            patch(
+                "machine_setup.windows.install_winget_package",
+                side_effect=winget_side_effect,
+            ),
         ):
             setup_windows_configs(dotfiles)
             assert "Failed to install AutoHotkey via winget" in caplog.text
@@ -358,8 +364,53 @@ class TestSetupWindowsConfigs:
             patch("machine_setup.windows.is_wsl", return_value=True),
             patch("machine_setup.windows.get_windows_username", return_value="TestUser"),
             patch("machine_setup.windows.get_windows_terminal_settings", return_value=wt_dst),
+            patch("machine_setup.windows.install_winget_package", return_value=True),
         ):
             setup_windows_configs(dotfiles)
 
             assert wt_dst.exists()
             assert "Installed Windows Terminal settings" in caplog.text
+
+    def test_installs_powertoys(self, tmp_path, caplog):
+        """Test PowerToys is installed via winget."""
+        import logging
+
+        caplog.set_level(logging.INFO)
+
+        dotfiles = tmp_path / "dotfiles"
+        dotfiles.mkdir()
+
+        with (
+            patch("machine_setup.windows.is_wsl", return_value=True),
+            patch("machine_setup.windows.get_windows_username", return_value="TestUser"),
+            patch("machine_setup.windows.install_winget_package", return_value=True) as mock_winget,
+        ):
+            setup_windows_configs(dotfiles)
+
+            assert call("Microsoft.PowerToys") in mock_winget.call_args_list
+            assert "Installing PowerToys via winget" in caplog.text
+            assert "PowerToys installed successfully" in caplog.text
+
+    def test_warns_on_powertoys_failure(self, tmp_path, caplog):
+        """Test warning when PowerToys installation fails."""
+        import logging
+
+        caplog.set_level(logging.WARNING)
+
+        dotfiles = tmp_path / "dotfiles"
+        dotfiles.mkdir()
+
+        def winget_side_effect(package_id):
+            return package_id != "Microsoft.PowerToys"
+
+        with (
+            patch("machine_setup.windows.is_wsl", return_value=True),
+            patch("machine_setup.windows.get_windows_username", return_value="TestUser"),
+            patch(
+                "machine_setup.windows.install_winget_package",
+                side_effect=winget_side_effect,
+            ),
+        ):
+            setup_windows_configs(dotfiles)
+
+            assert "Failed to install PowerToys via winget" in caplog.text

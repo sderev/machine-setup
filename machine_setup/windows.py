@@ -143,3 +143,10 @@ def setup_windows_configs(dotfiles_path: Path) -> None:
             logger.info("Installed Windows Terminal settings")
         else:
             logger.debug("Windows Terminal not installed, skipping settings copy")
+
+    # Install PowerToys
+    logger.info("Installing PowerToys via winget...")
+    if install_winget_package("Microsoft.PowerToys"):
+        logger.info("PowerToys installed successfully")
+    else:
+        logger.warning("Failed to install PowerToys via winget")
