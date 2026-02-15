@@ -93,10 +93,6 @@ def install_quarto() -> None:
     )
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
-            if response.status != 200:
-                raise RuntimeError(
-                    f"GitHub API returned status {response.status} for latest Quarto release"
-                )
             release = json.load(response)
     except urllib.error.URLError as exc:
         raise RuntimeError("Failed to fetch Quarto release metadata") from exc
@@ -124,9 +120,10 @@ def install_quarto() -> None:
     try:
         with tempfile.NamedTemporaryFile(suffix=".deb", delete=False) as tmp:
             logger.info("Downloading %s", deb_url)
-            with urllib.request.urlopen(deb_url, timeout=30) as response:
-                if response.status != 200:
-                    raise RuntimeError(f"Quarto download returned status {response.status}")
+            dl_request = urllib.request.Request(
+                deb_url, headers={"User-Agent": "machine-setup/1.0"}
+            )
+            with urllib.request.urlopen(dl_request, timeout=30) as response:
                 tmp.write(response.read())
             deb_path = tmp.name
 
@@ -335,10 +332,6 @@ def install_fira_code(*, skip_windows: bool = False) -> None:
     )
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
-            if response.status != 200:
-                raise RuntimeError(
-                    f"GitHub API returned status {response.status} for Fira Code release"
-                )
             release = json.load(response)
     except urllib.error.URLError as exc:
         raise RuntimeError("Failed to fetch Fira Code release metadata") from exc
@@ -360,11 +353,10 @@ def install_fira_code(*, skip_windows: bool = False) -> None:
         with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
             logger.info("Downloading %s", zip_url)
             try:
-                with urllib.request.urlopen(zip_url, timeout=30) as dl_response:
-                    if dl_response.status != 200:
-                        raise RuntimeError(
-                            f"Fira Code download returned status {dl_response.status}"
-                        )
+                dl_request = urllib.request.Request(
+                    zip_url, headers={"User-Agent": "machine-setup/1.0"}
+                )
+                with urllib.request.urlopen(dl_request, timeout=30) as dl_response:
                     tmp.write(dl_response.read())
             except urllib.error.URLError as exc:
                 raise RuntimeError("Failed to download Fira Code release") from exc
