@@ -104,4 +104,12 @@ machine-setup keys prune --older-than 30d --yes
 
 ## Windows configuration (WSL only)
 
-When running in WSL, Windows configuration is applied automatically. Use `--skip-windows` to disable it.
+WSL is auto-detected via `/proc/version` and the `WSL_DISTRO_NAME` environment variable. On native Linux, these steps are a no-op.
+
+When running in WSL, the following are applied automatically:
+
+* AutoHotkey keyboard remapping (copied to Windows Startup)
+* Windows Terminal `settings.json`
+* PowerToys (installed via `winget`)
+
+Use `--skip-windows` to disable all Windows configuration.
