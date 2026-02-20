@@ -83,6 +83,11 @@ def get_windows_terminal_settings(username: str) -> Path:
     )
 
 
+def get_filepilot_config(username: str) -> Path:
+    """Get File Pilot config path."""
+    return Path(f"/mnt/c/Users/{username}/AppData/Roaming/Voidstar/FilePilot/FPilot-Config.json")
+
+
 def install_winget_package(package_id: str) -> bool:
     """Install a package via winget.
 
@@ -155,3 +160,19 @@ def setup_windows_configs(dotfiles_path: Path) -> None:
         logger.info("PowerToys installed successfully")
     else:
         logger.warning("Failed to install PowerToys via winget")
+
+    # Install File Pilot and copy config
+    logger.info("Installing File Pilot via winget...")
+    if install_winget_package("Voidstar.FilePilot"):
+        logger.info("File Pilot installed successfully")
+    else:
+        logger.warning("Failed to install File Pilot via winget")
+
+    fp_src = dotfiles_path / "windows" / "filepilot" / "FPilot-Config.json"
+    if fp_src.exists():
+        fp_dst = get_filepilot_config(username)
+        if fp_dst.parent.exists():
+            shutil.copy2(fp_src, fp_dst)
+            logger.info("Installed File Pilot config")
+        else:
+            logger.debug("File Pilot not installed, skipping config copy")

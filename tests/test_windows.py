@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import call, patch
 
 from machine_setup.windows import (
+    get_filepilot_config,
     get_windows_fonts_dir,
     get_windows_startup_folder,
     get_windows_terminal_settings,
@@ -249,6 +250,18 @@ class TestGetWindowsTerminalSettings:
         assert result == expected
 
 
+class TestGetFilePilotConfig:
+    """Tests for get_filepilot_config function."""
+
+    def test_returns_correct_path(self):
+        """Test that correct File Pilot config path is returned."""
+        result = get_filepilot_config("TestUser")
+        expected = Path(
+            "/mnt/c/Users/TestUser/AppData/Roaming/Voidstar/FilePilot/FPilot-Config.json"
+        )
+        assert result == expected
+
+
 class TestSetupWindowsConfigs:
     """Tests for setup_windows_configs function."""
 
@@ -425,3 +438,101 @@ class TestSetupWindowsConfigs:
             setup_windows_configs(dotfiles)
 
             assert "Failed to install PowerToys via winget" in caplog.text
+
+    def test_installs_filepilot(self, tmp_path, caplog):
+        """Test File Pilot is installed via winget."""
+        import logging
+
+        caplog.set_level(logging.INFO)
+
+        dotfiles = tmp_path / "dotfiles"
+        dotfiles.mkdir()
+
+        with (
+            patch("machine_setup.windows.is_wsl", return_value=True),
+            patch("machine_setup.windows.get_windows_username", return_value="TestUser"),
+            patch("machine_setup.windows.install_winget_package", return_value=True) as mock_winget,
+        ):
+            setup_windows_configs(dotfiles)
+
+            assert call("Voidstar.FilePilot") in mock_winget.call_args_list
+            assert "File Pilot installed successfully" in caplog.text
+
+    def test_warns_on_filepilot_failure(self, tmp_path, caplog):
+        """Test warning when File Pilot installation fails."""
+        import logging
+
+        caplog.set_level(logging.WARNING)
+
+        dotfiles = tmp_path / "dotfiles"
+        dotfiles.mkdir()
+
+        def winget_side_effect(package_id):
+            return package_id != "Voidstar.FilePilot"
+
+        with (
+            patch("machine_setup.windows.is_wsl", return_value=True),
+            patch("machine_setup.windows.get_windows_username", return_value="TestUser"),
+            patch(
+                "machine_setup.windows.install_winget_package",
+                side_effect=winget_side_effect,
+            ),
+        ):
+            setup_windows_configs(dotfiles)
+
+            assert "Failed to install File Pilot via winget" in caplog.text
+
+    def test_installs_filepilot_config(self, tmp_path, caplog):
+        """Test File Pilot config is copied when source and dest dir exist."""
+        import logging
+
+        caplog.set_level(logging.INFO)
+
+        dotfiles = tmp_path / "dotfiles"
+        dotfiles.mkdir()
+        fp_dir = dotfiles / "windows" / "filepilot"
+        fp_dir.mkdir(parents=True)
+        fp_src = fp_dir / "FPilot-Config.json"
+        fp_src.write_text('{"theme": "dark"}')
+
+        fp_dst_dir = tmp_path / "FilePilot"
+        fp_dst_dir.mkdir()
+        fp_dst = fp_dst_dir / "FPilot-Config.json"
+
+        with (
+            patch("machine_setup.windows.is_wsl", return_value=True),
+            patch("machine_setup.windows.get_windows_username", return_value="TestUser"),
+            patch("machine_setup.windows.install_winget_package", return_value=True),
+            patch("machine_setup.windows.get_filepilot_config", return_value=fp_dst),
+        ):
+            setup_windows_configs(dotfiles)
+
+            assert fp_dst.exists()
+            assert fp_dst.read_text() == '{"theme": "dark"}'
+            assert "Installed File Pilot config" in caplog.text
+
+    def test_skips_filepilot_config_when_dir_missing(self, tmp_path, caplog):
+        """Test File Pilot config is skipped when dest dir does not exist."""
+        import logging
+
+        caplog.set_level(logging.DEBUG)
+
+        dotfiles = tmp_path / "dotfiles"
+        dotfiles.mkdir()
+        fp_dir = dotfiles / "windows" / "filepilot"
+        fp_dir.mkdir(parents=True)
+        fp_src = fp_dir / "FPilot-Config.json"
+        fp_src.write_text('{"theme": "dark"}')
+
+        fp_dst = tmp_path / "nonexistent" / "FPilot-Config.json"
+
+        with (
+            patch("machine_setup.windows.is_wsl", return_value=True),
+            patch("machine_setup.windows.get_windows_username", return_value="TestUser"),
+            patch("machine_setup.windows.install_winget_package", return_value=True),
+            patch("machine_setup.windows.get_filepilot_config", return_value=fp_dst),
+        ):
+            setup_windows_configs(dotfiles)
+
+            assert not fp_dst.exists()
+            assert "File Pilot not installed, skipping config copy" in caplog.text

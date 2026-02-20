@@ -112,6 +112,7 @@ When running in WSL, the following are applied automatically:
 * AutoHotkey keyboard remapping (copied to Windows Startup)
 * Windows Terminal `settings.json`
 * PowerToys (installed via `winget`)
+* File Pilot (installed via `winget`, config deployed from dotfiles)
 * Fira Code font (installed to the Windows per-user font directory)
 
 Use `--skip-windows` to disable all Windows configuration.
