@@ -110,9 +110,17 @@ WSL is auto-detected via `/proc/version` and the `WSL_DISTRO_NAME` environment v
 When running in WSL, the following are applied automatically:
 
 * AutoHotkey keyboard remapping (copied to Windows Startup)
+* Google Chrome (installed via `winget`)
+* Brave (installed via `winget`)
+* Proton Pass (installed via `winget`)
+* VLC (installed via `winget`)
+* Windows Terminal (installed via `winget`)
 * Windows Terminal `settings.json`
 * PowerToys (installed via `winget`)
 * File Pilot (installed via `winget`, config deployed from dotfiles)
+* One-time best-effort taskbar pinning in this order:
+  Chrome, Brave, Windows Terminal, Windows Clock, Calculator
+  (state file: `%LOCALAPPDATA%\\machine-setup\\taskbar-pinning-v1.done`)
 * Fira Code font (installed to the Windows per-user font directory)
 
 Use `--skip-windows` to disable all Windows configuration.

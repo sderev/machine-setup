@@ -2,15 +2,21 @@
 
 import builtins
 from pathlib import Path
-from unittest.mock import call, patch
+from unittest.mock import Mock, call, patch
+
+import pytest
 
 from machine_setup.windows import (
     get_filepilot_config,
+    get_machine_setup_state_dir,
+    get_taskbar_pinning_sentinel,
     get_windows_fonts_dir,
     get_windows_startup_folder,
     get_windows_terminal_settings,
     get_windows_username,
     is_wsl,
+    pin_taskbar_apps,
+    pin_taskbar_apps_once,
     setup_windows_configs,
 )
 
@@ -262,8 +268,79 @@ class TestGetFilePilotConfig:
         assert result == expected
 
 
+class TestTaskbarPinning:
+    """Tests for taskbar pinning helpers."""
+
+    def test_machine_setup_state_dir_path(self):
+        """State directory is located under Local AppData."""
+        result = get_machine_setup_state_dir("TestUser")
+        expected = Path("/mnt/c/Users/TestUser/AppData/Local/machine-setup")
+        assert result == expected
+
+    def test_taskbar_pinning_sentinel_path(self):
+        """Taskbar pinning sentinel path is stable."""
+        result = get_taskbar_pinning_sentinel("TestUser")
+        expected = Path("/mnt/c/Users/TestUser/AppData/Local/machine-setup/taskbar-pinning-v1.done")
+        assert result == expected
+
+    def test_pin_taskbar_apps_runs_powershell(self):
+        """Taskbar pinning should call powershell.exe."""
+        mock_result = Mock(returncode=0)
+
+        with patch("machine_setup.windows.run", return_value=mock_result) as mock_run:
+            assert pin_taskbar_apps() is True
+            mock_run.assert_called_once()
+            assert mock_run.call_args.args[0][0] == "powershell.exe"
+
+    def test_pin_taskbar_apps_handles_run_failure(self, caplog):
+        """Taskbar pinning should log and continue on command failures."""
+        import logging
+
+        caplog.set_level(logging.WARNING)
+        mock_result = Mock(returncode=1)
+
+        with patch("machine_setup.windows.run", return_value=mock_result):
+            assert pin_taskbar_apps() is False
+
+        assert "Taskbar pinning command failed with exit code 1" in caplog.text
+
+    def test_pin_taskbar_apps_once_writes_sentinel(self, tmp_path):
+        """First run should attempt pinning and create sentinel."""
+        sentinel = tmp_path / "taskbar-pinning-v1.done"
+
+        with (
+            patch("machine_setup.windows.get_taskbar_pinning_sentinel", return_value=sentinel),
+            patch("machine_setup.windows.pin_taskbar_apps", return_value=True) as mock_pin,
+        ):
+            pin_taskbar_apps_once("TestUser")
+
+        mock_pin.assert_called_once()
+        assert sentinel.exists()
+
+    def test_pin_taskbar_apps_once_skips_when_already_done(self, tmp_path):
+        """Second run should skip when sentinel already exists."""
+        sentinel = tmp_path / "taskbar-pinning-v1.done"
+        sentinel.parent.mkdir(parents=True, exist_ok=True)
+        sentinel.write_text("done\n")
+
+        with (
+            patch("machine_setup.windows.get_taskbar_pinning_sentinel", return_value=sentinel),
+            patch("machine_setup.windows.pin_taskbar_apps") as mock_pin,
+        ):
+            pin_taskbar_apps_once("TestUser")
+
+        mock_pin.assert_not_called()
+
+
 class TestSetupWindowsConfigs:
     """Tests for setup_windows_configs function."""
+
+    @pytest.fixture(autouse=True)
+    def _mock_taskbar_pinning(self, monkeypatch):
+        """Avoid invoking real PowerShell in setup path tests."""
+        mock = Mock()
+        monkeypatch.setattr("machine_setup.windows.pin_taskbar_apps_once", mock)
+        return mock
 
     def test_skips_when_not_wsl(self, monkeypatch, caplog):
         """Test that function returns early when not in WSL."""
@@ -394,6 +471,73 @@ class TestSetupWindowsConfigs:
 
             assert wt_dst.exists()
             assert "Installed Windows Terminal settings" in caplog.text
+
+    def test_installs_expected_winget_packages(self, tmp_path):
+        """Requested app package IDs are installed via winget."""
+        dotfiles = tmp_path / "dotfiles"
+        dotfiles.mkdir()
+
+        with (
+            patch("machine_setup.windows.is_wsl", return_value=True),
+            patch("machine_setup.windows.get_windows_username", return_value="TestUser"),
+            patch("machine_setup.windows.install_winget_package", return_value=True) as mock_winget,
+        ):
+            setup_windows_configs(dotfiles)
+
+        expected_package_ids = [
+            "Google.Chrome",
+            "Brave.Brave",
+            "Proton.ProtonPass",
+            "VideoLAN.VLC",
+            "Microsoft.WindowsTerminal",
+            "Microsoft.PowerToys",
+            "Voidstar.FilePilot",
+        ]
+        for package_id in expected_package_ids:
+            assert call(package_id) in mock_winget.call_args_list
+
+    def test_attempts_taskbar_pinning(self, tmp_path, _mock_taskbar_pinning):
+        """Taskbar pinning is invoked during Windows setup."""
+        dotfiles = tmp_path / "dotfiles"
+        dotfiles.mkdir()
+
+        with (
+            patch("machine_setup.windows.is_wsl", return_value=True),
+            patch("machine_setup.windows.get_windows_username", return_value="TestUser"),
+            patch("machine_setup.windows.install_winget_package", return_value=True),
+        ):
+            setup_windows_configs(dotfiles)
+
+        _mock_taskbar_pinning.assert_called_once_with("TestUser")
+
+    def test_copies_terminal_settings_after_terminal_install_attempt(self, tmp_path):
+        """Windows Terminal settings copy happens after install attempt."""
+        dotfiles = tmp_path / "dotfiles"
+        dotfiles.mkdir()
+        wt_dir = dotfiles / "windows" / "windows_terminal"
+        wt_dir.mkdir(parents=True)
+        wt_src = wt_dir / "settings.json"
+        wt_src.write_text('{"profiles": []}')
+
+        wt_dst_dir = tmp_path / "WindowsTerminal"
+        wt_dst_dir.mkdir()
+        wt_dst = wt_dst_dir / "settings.json"
+
+        manager = Mock()
+        with (
+            patch("machine_setup.windows.is_wsl", return_value=True),
+            patch("machine_setup.windows.get_windows_username", return_value="TestUser"),
+            patch("machine_setup.windows.install_winget_package", return_value=True) as mock_winget,
+            patch("machine_setup.windows.get_windows_terminal_settings", return_value=wt_dst),
+            patch("machine_setup.windows.shutil.copy2") as mock_copy2,
+        ):
+            manager.attach_mock(mock_winget, "winget")
+            manager.attach_mock(mock_copy2, "copy2")
+            setup_windows_configs(dotfiles)
+
+        terminal_install_call = manager.mock_calls.index(call.winget("Microsoft.WindowsTerminal"))
+        terminal_copy_call = manager.mock_calls.index(call.copy2(wt_src, wt_dst))
+        assert terminal_install_call < terminal_copy_call
 
     def test_installs_powertoys(self, tmp_path, caplog):
         """Test PowerToys is installed via winget."""
