@@ -27,6 +27,40 @@ LOCALE = "en_US.UTF-8"
 CLAUDE_INSTALL_URL = "https://claude.ai/install.sh"
 
 
+def setup_timezone(timezone: str) -> None:
+    """Configure system timezone using zoneinfo data."""
+    zoneinfo_root = Path("/usr/share/zoneinfo")
+    zoneinfo_path = zoneinfo_root / timezone
+    zoneinfo_root_resolved = zoneinfo_root.resolve(strict=False)
+    zoneinfo_path_resolved = zoneinfo_path.resolve(strict=False)
+
+    if not zoneinfo_path_resolved.is_relative_to(zoneinfo_root_resolved):
+        raise RuntimeError(f"Timezone {timezone!r} is not available under /usr/share/zoneinfo")
+
+    if not zoneinfo_path_resolved.exists():
+        raise RuntimeError(f"Timezone {timezone!r} is not available under /usr/share/zoneinfo")
+
+    if not zoneinfo_path_resolved.is_file():
+        raise RuntimeError(f"Timezone {timezone!r} is not available under /usr/share/zoneinfo")
+
+    current_timezone = ""
+    timezone_file = Path("/etc/timezone")
+    if timezone_file.exists():
+        try:
+            current_timezone = timezone_file.read_text(encoding="utf-8").strip()
+        except OSError:
+            current_timezone = ""
+
+    if current_timezone == timezone:
+        logger.info("Timezone %s already configured", timezone)
+        return
+
+    sudo = sudo_prefix()
+    run([*sudo, "ln", "-snf", str(zoneinfo_path_resolved), "/etc/localtime"])
+    run([*sudo, "sh", "-c", 'printf "%s\\n" "$1" > /etc/timezone', "_", timezone])
+    logger.info("Timezone configured: %s", timezone)
+
+
 def is_package_installed(package: str) -> bool:
     """Check if a Debian package is installed."""
     result = run(

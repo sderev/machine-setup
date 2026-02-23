@@ -3,9 +3,34 @@
 import logging
 from pathlib import Path
 
+import pytest
 from pytest import LogCaptureFixture
 
-from machine_setup.dotfiles import rebuild_bat_cache, remove_default_dotfiles, setup_scripts_symlink
+from machine_setup.dotfiles import (
+    create_repos_structure,
+    rebuild_bat_cache,
+    remove_default_dotfiles,
+    setup_scripts_symlink,
+)
+
+
+def test_create_repos_structure_uses_owner_namespace(tmp_path: Path) -> None:
+    """Repos layout should include owner namespace from private config."""
+    create_repos_structure(tmp_path, "acme")
+
+    assert (tmp_path / "Repos" / "github.com" / "clone").exists()
+    assert (tmp_path / "Repos" / "github.com" / "forks").exists()
+    assert (tmp_path / "Repos" / "github.com" / "acme").exists()
+
+
+@pytest.mark.parametrize("owner_namespace", ["acme/team", "acme\\team", ".", ".."])
+def test_create_repos_structure_rejects_invalid_namespace(
+    tmp_path: Path,
+    owner_namespace: str,
+) -> None:
+    """Owner namespace should be exactly one directory name."""
+    with pytest.raises(RuntimeError, match="owner_namespace"):
+        create_repos_structure(tmp_path, owner_namespace)
 
 
 def test_remove_default_dotfiles_backs_up_files(tmp_path: Path) -> None:

@@ -34,6 +34,122 @@ class FakeResponse:
         return False
 
 
+def _patch_system_paths(monkeypatch, tmp_path: Path) -> None:
+    """Redirect absolute system paths into a temp root for tests."""
+    real_path = Path
+
+    def fake_path(value: str | os.PathLike[str]) -> Path:
+        path = real_path(value)
+        if path.is_absolute():
+            return tmp_path / str(path).lstrip("/")
+        return path
+
+    monkeypatch.setattr(installers, "Path", fake_path)
+
+
+# --- Timezone tests ---
+
+
+def test_setup_timezone_configures_when_current_is_different(monkeypatch, tmp_path: Path) -> None:
+    """Timezone setup should update links/files when current timezone differs."""
+    _patch_system_paths(monkeypatch, tmp_path)
+    zoneinfo_path = tmp_path / "usr/share/zoneinfo/Europe/Paris"
+    zoneinfo_path.parent.mkdir(parents=True, exist_ok=True)
+    zoneinfo_path.write_text("zoneinfo")
+    timezone_file = tmp_path / "etc/timezone"
+    timezone_file.parent.mkdir(parents=True, exist_ok=True)
+    timezone_file.write_text("UTC\n")
+
+    run_calls: list[list[str]] = []
+    monkeypatch.setattr(installers, "sudo_prefix", lambda: ["sudo"])
+    monkeypatch.setattr(
+        installers,
+        "run",
+        lambda cmd: run_calls.append(list(cmd)) or SimpleNamespace(returncode=0),
+    )
+
+    installers.setup_timezone("Europe/Paris")
+
+    assert run_calls == [
+        ["sudo", "ln", "-snf", str(zoneinfo_path), "/etc/localtime"],
+        [
+            "sudo",
+            "sh",
+            "-c",
+            'printf "%s\\n" "$1" > /etc/timezone',
+            "_",
+            "Europe/Paris",
+        ],
+    ]
+
+
+def test_setup_timezone_is_noop_when_already_configured(
+    monkeypatch,
+    tmp_path: Path,
+    caplog,
+) -> None:
+    """Timezone setup should not run commands when already configured."""
+    _patch_system_paths(monkeypatch, tmp_path)
+    zoneinfo_path = tmp_path / "usr/share/zoneinfo/Europe/Paris"
+    zoneinfo_path.parent.mkdir(parents=True, exist_ok=True)
+    zoneinfo_path.write_text("zoneinfo")
+    timezone_file = tmp_path / "etc/timezone"
+    timezone_file.parent.mkdir(parents=True, exist_ok=True)
+    timezone_file.write_text("Europe/Paris\n")
+
+    monkeypatch.setattr(
+        installers,
+        "run",
+        lambda _cmd: (_ for _ in ()).throw(AssertionError("run must not be called")),
+    )
+
+    caplog.set_level(logging.INFO, logger="machine_setup")
+    installers.setup_timezone("Europe/Paris")
+
+    assert "already configured" in caplog.text
+
+
+def test_setup_timezone_raises_when_zoneinfo_is_missing(monkeypatch, tmp_path: Path) -> None:
+    """Timezone setup should fail fast when zoneinfo file is unavailable."""
+    _patch_system_paths(monkeypatch, tmp_path)
+
+    with pytest.raises(RuntimeError, match="is not available under /usr/share/zoneinfo"):
+        installers.setup_timezone("Europe/Paris")
+
+
+def test_setup_timezone_rejects_zoneinfo_directory(monkeypatch, tmp_path: Path) -> None:
+    """Timezone setup should reject zoneinfo directories like `posix`."""
+    _patch_system_paths(monkeypatch, tmp_path)
+    zoneinfo_dir = tmp_path / "usr/share/zoneinfo/posix"
+    zoneinfo_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(
+        installers,
+        "run",
+        lambda _cmd: (_ for _ in ()).throw(AssertionError("run must not be called")),
+    )
+
+    with pytest.raises(RuntimeError, match="is not available under /usr/share/zoneinfo"):
+        installers.setup_timezone("posix")
+
+
+@pytest.mark.parametrize("timezone", ["../etc/passwd", "/etc/passwd"])
+def test_setup_timezone_rejects_zoneinfo_path_escape(
+    monkeypatch,
+    tmp_path: Path,
+    timezone: str,
+) -> None:
+    """Timezone setup should reject path escapes outside `/usr/share/zoneinfo`."""
+    _patch_system_paths(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        installers,
+        "run",
+        lambda _cmd: (_ for _ in ()).throw(AssertionError("run must not be called")),
+    )
+
+    with pytest.raises(RuntimeError, match="is not available under /usr/share/zoneinfo"):
+        installers.setup_timezone(timezone)
+
+
 # --- Node.js (n) tests ---
 
 
@@ -71,16 +187,11 @@ def test_install_node_downloads_n_and_runs_lts(monkeypatch, caplog) -> None:
     caplog.set_level("INFO", logger="machine_setup")
     installers.install_node()
 
-    # curl downloads n
     assert any("curl" in cmd[0] and installers.N_INSTALL_URL in cmd for cmd in calls)
-    # mv to /usr/local/bin/n
     assert any(cmd[:2] == ["sudo", "mv"] and cmd[-1] == "/usr/local/bin/n" for cmd in calls)
-    # chmod +x
     assert any("chmod" in cmd for cmd in calls)
-    # n lts
     assert any(cmd == ["sudo", "n", "lts"] for cmd in calls)
     assert "Node.js LTS installed successfully" in caplog.text
-    # tmp file was mv'd, so os.remove should not have been called
     assert not removed
 
 
@@ -108,7 +219,6 @@ def test_install_node_warns_on_download_failure(monkeypatch, caplog) -> None:
     installers.install_node()
 
     assert "Failed to download n" in caplog.text
-    # Temp file should be cleaned up
     assert removed
 
 

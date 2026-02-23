@@ -1,13 +1,22 @@
 """WSL detection and Windows configuration setup."""
 
+import hashlib
 import logging
 import os
 import shutil
+import tempfile
 from pathlib import Path
 
-from machine_setup.utils import run
+from machine_setup.utils import run, sudo_prefix
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10
+    import tomli as tomllib  # type: ignore[import-not-found]
 
 logger = logging.getLogger("machine_setup")
+
+BOOTSTRAP_STATE_RELATIVE_PATH = Path(".config") / "machine-setup" / "bootstrap.toml"
 
 
 TASKBAR_PINNING_SCRIPT = """
@@ -99,6 +108,194 @@ if ($missing.Count -gt 0 -or $failed.Count -gt 0) {
     throw ($errors -join '; ')
 }
 """
+
+
+def get_bootstrap_state_path(home: Path | None = None) -> Path:
+    """Return local bootstrap state path."""
+    state_home = home if home is not None else Path.home()
+    return state_home / BOOTSTRAP_STATE_RELATIVE_PATH
+
+
+def load_bootstrap_state(state_path: Path | None = None) -> dict[str, object]:
+    """Load local bootstrap state from TOML."""
+    path = state_path if state_path is not None else get_bootstrap_state_path()
+    if not path.exists():
+        return {}
+
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError as error:
+        logger.warning("Could not read bootstrap state at %s: %s", path, error)
+        return {}
+
+    try:
+        parsed = tomllib.loads(raw)
+    except Exception as error:
+        logger.warning("Ignoring invalid bootstrap state at %s: %s", path, error)
+        return {}
+
+    if not isinstance(parsed, dict):
+        logger.warning("Ignoring invalid bootstrap state at %s: root must be a TOML table", path)
+        return {}
+
+    state: dict[str, object] = {}
+    if isinstance(parsed.get("dotfiles_repo"), str):
+        state["dotfiles_repo"] = parsed["dotfiles_repo"]
+    if isinstance(parsed.get("dotfiles_branch"), str):
+        state["dotfiles_branch"] = parsed["dotfiles_branch"]
+    if isinstance(parsed.get("apply_wslconfig"), bool):
+        state["apply_wslconfig"] = parsed["apply_wslconfig"]
+    if isinstance(parsed.get("wslconfig_source_checksum"), str):
+        state["wslconfig_source_checksum"] = parsed["wslconfig_source_checksum"]
+    return state
+
+
+def save_bootstrap_state(
+    state: dict[str, object],
+    state_path: Path | None = None,
+) -> Path:
+    """Persist local bootstrap state as TOML."""
+    path = state_path if state_path is not None else get_bootstrap_state_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    lines: list[str] = []
+    if isinstance(state.get("dotfiles_repo"), str):
+        lines.append(f'dotfiles_repo = "{_toml_escape(state["dotfiles_repo"])}"')
+    if isinstance(state.get("dotfiles_branch"), str):
+        lines.append(f'dotfiles_branch = "{_toml_escape(state["dotfiles_branch"])}"')
+    if isinstance(state.get("apply_wslconfig"), bool):
+        value = "true" if state["apply_wslconfig"] else "false"
+        lines.append(f"apply_wslconfig = {value}")
+    if isinstance(state.get("wslconfig_source_checksum"), str):
+        escaped = _toml_escape(state["wslconfig_source_checksum"])
+        lines.append(f'wslconfig_source_checksum = "{escaped}"')
+
+    content = "\n".join(lines)
+    if content:
+        content += "\n"
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.tmp-", dir=path.parent)
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(content)
+        os.chmod(tmp_path, 0o600)
+        os.replace(tmp_path, path)
+        os.chmod(path, 0o600)
+    except OSError:
+        tmp_path.unlink(missing_ok=True)
+        raise
+    return path
+
+
+def get_wsl_conf_source(dotfiles_path: Path) -> Path:
+    """Get `/etc/wsl.conf` source file path from dotfiles."""
+    return dotfiles_path / "machine-setup" / "wsl" / "wsl.conf"
+
+
+def get_wslconfig_source(dotfiles_path: Path) -> Path:
+    """Get `%UserProfile%\\.wslconfig` source file path from dotfiles."""
+    return dotfiles_path / "machine-setup" / "wsl" / ".wslconfig"
+
+
+def compute_file_checksum(path: Path) -> str:
+    """Compute SHA256 checksum for file content."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def deploy_wsl_conf(dotfiles_path: Path) -> bool:
+    """Deploy `/etc/wsl.conf` from private dotfiles when available."""
+    source_path = get_wsl_conf_source(dotfiles_path)
+    target_path = Path("/etc/wsl.conf")
+
+    if not source_path.exists():
+        logger.info("WSL distro config not found at %s, skipping", source_path)
+        return False
+
+    try:
+        source_bytes = source_path.read_bytes()
+    except OSError as error:
+        logger.warning("Could not read WSL distro config %s: %s", source_path, error)
+        return False
+
+    if target_path.exists():
+        try:
+            if source_bytes == target_path.read_bytes():
+                logger.info("%s already up to date", target_path)
+                return False
+        except OSError as error:
+            logger.warning("Could not compare %s: %s", target_path, error)
+
+    if os.geteuid() == 0:
+        try:
+            shutil.copy2(source_path, target_path)
+            target_path.chmod(0o644)
+        except OSError as error:
+            logger.warning("Could not deploy %s: %s", target_path, error)
+            return False
+    else:
+        sudo = sudo_prefix()
+        result = run(
+            [*sudo, "install", "-m", "644", str(source_path), str(target_path)],
+            check=False,
+            capture=True,
+        )
+        if result.returncode != 0:
+            stderr = result.stderr.strip() if result.stderr else "unknown error"
+            logger.warning("Could not deploy %s with sudo: %s", target_path, stderr)
+            return False
+
+    logger.info("Installed WSL distro config: %s", target_path)
+    return True
+
+
+def get_windows_wslconfig_path(username: str) -> Path:
+    """Get Windows host `.wslconfig` path."""
+    return Path(f"/mnt/c/Users/{username}/.wslconfig")
+
+
+def deploy_wslconfig(dotfiles_path: Path, username: str) -> bool:
+    """Deploy host `.wslconfig` from private dotfiles."""
+    source_path = get_wslconfig_source(dotfiles_path)
+    target_path = get_windows_wslconfig_path(username)
+
+    if not source_path.exists():
+        logger.info("WSL host config not found at %s, skipping", source_path)
+        return False
+
+    try:
+        source_bytes = source_path.read_bytes()
+    except OSError as error:
+        logger.warning("Could not read WSL host config %s: %s", source_path, error)
+        return False
+
+    changed = True
+    if target_path.exists():
+        try:
+            changed = target_path.read_bytes() != source_bytes
+        except OSError as error:
+            logger.warning("Could not compare %s: %s", target_path, error)
+
+    try:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, target_path)
+    except OSError as error:
+        logger.warning("Could not deploy %s: %s", target_path, error)
+        return False
+
+    if changed:
+        logger.info("Installed Windows host WSL config: %s", target_path)
+    else:
+        logger.info("Windows host WSL config already up to date: %s", target_path)
+    return changed
+
+
+def _toml_escape(value: object) -> str:
+    text = str(value)
+    return text.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def is_wsl() -> bool:

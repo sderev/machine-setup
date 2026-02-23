@@ -2,17 +2,42 @@
 
 import pytest
 
-from machine_setup.presets import (
-    NPM_TOOLS_DEV,
-    NPM_TOOLS_FULL,
-    NPM_TOOLS_MINIMAL,
-    PACKAGES_DEV,
-    PACKAGES_FULL,
-    PACKAGES_MINIMAL,
-    STOW_PACKAGES,
-    Preset,
-    SetupConfig,
+from machine_setup.presets import Preset, SetupConfig
+from machine_setup.private_config import (
+    PresetSettings,
+    PrivateConfig,
+    ReposSettings,
+    SetupSettings,
+    WslSettings,
 )
+
+
+def _private_config() -> PrivateConfig:
+    return PrivateConfig(
+        setup=SetupSettings(timezone="America/New_York"),
+        repos=ReposSettings(owner_namespace="acme"),
+        presets={
+            "minimal": PresetSettings(
+                packages=["git", "curl"],
+                uv_tools=["ruff"],
+                npm_tools=["@ccusage/codex"],
+                stow_packages=["shell", "git"],
+            ),
+            "dev": PresetSettings(
+                packages=["gcc"],
+                uv_tools=["ty"],
+                npm_tools=["opencode-ai"],
+                stow_packages=["shell", "git", "vim"],
+            ),
+            "full": PresetSettings(
+                packages=["texlive"],
+                uv_tools=["wslshot"],
+                npm_tools=["@openai/codex"],
+                stow_packages=["shell", "git", "vim", "gui"],
+            ),
+        },
+        wsl=WslSettings(apply_wslconfig=True),
+    )
 
 
 class TestPreset:
@@ -39,25 +64,29 @@ class TestPreset:
 class TestSetupConfig:
     """Tests for SetupConfig dataclass."""
 
-    def test_default_config(self):
-        """Test default configuration values."""
-        config = SetupConfig(preset=Preset.DEV)
-        assert config.preset == Preset.DEV
-        assert "github.com" in config.dotfiles_repo
-        assert config.dotfiles_dir == "~/Repos/github.com/sderev/.dotfiles_private"
-        assert config.home_dir == "~"
-
-    def test_custom_dotfiles_repo(self):
-        """Test custom dotfiles repo."""
-        config = SetupConfig(
-            preset=Preset.MINIMAL,
-            dotfiles_repo="https://github.com/user/dotfiles.git",
+    def test_from_private_config(self):
+        """Runtime config is built from private config values."""
+        config = SetupConfig.from_private_config(
+            preset=Preset.DEV,
+            private_config=_private_config(),
+            dotfiles_repo="https://github.com/acme/.dotfiles_private.git",
+            dotfiles_dir="/home/user/Repos/github.com/acme/.dotfiles_private",
+            dotfiles_branch="main",
         )
-        assert config.dotfiles_repo == "https://github.com/user/dotfiles.git"
+        assert config.preset == Preset.DEV
+        assert config.dotfiles_repo == "https://github.com/acme/.dotfiles_private.git"
+        assert config.dotfiles_branch == "main"
+        assert config.repos_owner_namespace == "acme"
 
     def test_config_is_frozen(self):
         """Test that config is immutable."""
-        config = SetupConfig(preset=Preset.DEV)
+        config = SetupConfig.from_private_config(
+            preset=Preset.DEV,
+            private_config=_private_config(),
+            dotfiles_repo="https://github.com/acme/.dotfiles_private.git",
+            dotfiles_dir="/tmp/.dotfiles_private",
+            dotfiles_branch="main",
+        )
         with pytest.raises(AttributeError):
             config.preset = Preset.FULL  # type: ignore[misc]
 
@@ -67,77 +96,74 @@ class TestGetPackages:
 
     def test_minimal_packages(self):
         """Test minimal preset returns only minimal packages."""
-        config = SetupConfig(preset=Preset.MINIMAL)
-        packages = config.get_packages()
-        assert set(packages) == set(PACKAGES_MINIMAL)
+        config = SetupConfig.from_private_config(
+            preset=Preset.MINIMAL,
+            private_config=_private_config(),
+            dotfiles_repo="https://github.com/acme/.dotfiles_private.git",
+            dotfiles_dir="/tmp/.dotfiles_private",
+            dotfiles_branch="main",
+        )
+        assert config.get_packages() == ["git", "curl"]
 
     def test_dev_packages(self):
         """Test dev preset returns minimal + dev packages."""
-        config = SetupConfig(preset=Preset.DEV)
-        packages = config.get_packages()
-        expected = set(PACKAGES_MINIMAL) | set(PACKAGES_DEV)
-        assert set(packages) == expected
+        config = SetupConfig.from_private_config(
+            preset=Preset.DEV,
+            private_config=_private_config(),
+            dotfiles_repo="https://github.com/acme/.dotfiles_private.git",
+            dotfiles_dir="/tmp/.dotfiles_private",
+            dotfiles_branch="main",
+        )
+        assert config.get_packages() == ["git", "curl", "gcc"]
 
     def test_full_packages(self):
         """Test full preset returns all packages."""
-        config = SetupConfig(preset=Preset.FULL)
-        packages = config.get_packages()
-        expected = set(PACKAGES_MINIMAL) | set(PACKAGES_DEV) | set(PACKAGES_FULL)
-        assert set(packages) == expected
-
-    def test_packages_include_git(self):
-        """Test that git is always included."""
-        for preset in Preset:
-            config = SetupConfig(preset=preset)
-            assert "git" in config.get_packages()
+        config = SetupConfig.from_private_config(
+            preset=Preset.FULL,
+            private_config=_private_config(),
+            dotfiles_repo="https://github.com/acme/.dotfiles_private.git",
+            dotfiles_dir="/tmp/.dotfiles_private",
+            dotfiles_branch="main",
+        )
+        assert config.get_packages() == ["git", "curl", "gcc", "texlive"]
 
 
 class TestGetStowPackages:
     """Tests for SetupConfig.get_stow_packages method."""
 
-    def test_minimal_stow_packages(self):
-        """Test minimal preset stow packages."""
-        config = SetupConfig(preset=Preset.MINIMAL)
-        assert config.get_stow_packages() == STOW_PACKAGES[Preset.MINIMAL]
-
-    def test_dev_stow_packages(self):
-        """Test dev preset stow packages."""
-        config = SetupConfig(preset=Preset.DEV)
-        assert config.get_stow_packages() == STOW_PACKAGES[Preset.DEV]
-
-    def test_full_stow_packages(self):
-        """Test full preset stow packages."""
-        config = SetupConfig(preset=Preset.FULL)
-        assert config.get_stow_packages() == STOW_PACKAGES[Preset.FULL]
-
-    def test_stow_always_includes_shell_and_git(self):
-        """Test that shell and git are always stowed."""
-        for preset in Preset:
-            config = SetupConfig(preset=preset)
-            stow_pkgs = config.get_stow_packages()
-            assert "shell" in stow_pkgs
-            assert "git" in stow_pkgs
+    def test_stow_uses_current_preset_only(self):
+        """Stow packages are not cumulative."""
+        config = SetupConfig.from_private_config(
+            preset=Preset.FULL,
+            private_config=_private_config(),
+            dotfiles_repo="https://github.com/acme/.dotfiles_private.git",
+            dotfiles_dir="/tmp/.dotfiles_private",
+            dotfiles_branch="main",
+        )
+        assert config.get_stow_packages() == ["shell", "git", "vim", "gui"]
 
 
-class TestGetNpmTools:
-    """Tests for SetupConfig.get_npm_tools method."""
+class TestToolLists:
+    """Tests for uv/npm tool list composition."""
 
-    def test_minimal_npm_tools(self):
-        """Test minimal preset returns minimal npm tools."""
-        config = SetupConfig(preset=Preset.MINIMAL)
-        tools = config.get_npm_tools()
-        assert set(tools) == set(NPM_TOOLS_MINIMAL)
+    def test_uv_tools_are_cumulative(self):
+        """UV tools should be composed from lower presets."""
+        config = SetupConfig.from_private_config(
+            preset=Preset.FULL,
+            private_config=_private_config(),
+            dotfiles_repo="https://github.com/acme/.dotfiles_private.git",
+            dotfiles_dir="/tmp/.dotfiles_private",
+            dotfiles_branch="main",
+        )
+        assert config.get_uv_tools() == ["ruff", "ty", "wslshot"]
 
-    def test_dev_npm_tools(self):
-        """Test dev preset returns minimal + dev npm tools."""
-        config = SetupConfig(preset=Preset.DEV)
-        tools = config.get_npm_tools()
-        expected = set(NPM_TOOLS_MINIMAL) | set(NPM_TOOLS_DEV)
-        assert set(tools) == expected
-
-    def test_full_npm_tools(self):
-        """Test full preset returns all npm tools."""
-        config = SetupConfig(preset=Preset.FULL)
-        tools = config.get_npm_tools()
-        expected = set(NPM_TOOLS_MINIMAL) | set(NPM_TOOLS_DEV) | set(NPM_TOOLS_FULL)
-        assert set(tools) == expected
+    def test_npm_tools_are_cumulative(self):
+        """NPM tools should be composed from lower presets."""
+        config = SetupConfig.from_private_config(
+            preset=Preset.FULL,
+            private_config=_private_config(),
+            dotfiles_repo="https://github.com/acme/.dotfiles_private.git",
+            dotfiles_dir="/tmp/.dotfiles_private",
+            dotfiles_branch="main",
+        )
+        assert config.get_npm_tools() == ["@ccusage/codex", "opencode-ai", "@openai/codex"]
