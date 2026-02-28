@@ -78,6 +78,60 @@ def install_packages(config: SetupConfig) -> None:
     logger.info("Package installation complete")
 
 
+N_INSTALL_URL = "https://raw.githubusercontent.com/tj/n/master/bin/n"
+
+
+def _command_works(cmd: list[str]) -> bool:
+    """Return True when command runs successfully."""
+    result = run(cmd, check=False, capture=True)
+    return result.returncode == 0
+
+
+def install_node() -> None:
+    """Install Node.js LTS via the `n` version manager."""
+    if (
+        command_exists("node")
+        and command_exists("npm")
+        and _command_works(["node", "--version"])
+        and _command_works(["npm", "--version"])
+    ):
+        logger.info("Node.js and npm already installed")
+        return
+
+    logger.info("Installing Node.js LTS via n...")
+
+    tmp_path = ""
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, prefix="n-") as tmp:
+            tmp_path = tmp.name
+
+        result = run(
+            ["curl", "-fsSL", "--max-time", "30", "-o", tmp_path, N_INSTALL_URL],
+            check=False,
+        )
+        if result.returncode != 0:
+            logger.warning("Failed to download n; skipping Node.js installation")
+            return
+
+        sudo = sudo_prefix()
+        run([*sudo, "mv", tmp_path, "/usr/local/bin/n"])
+        tmp_path = ""  # mv succeeded, nothing to clean up
+        run([*sudo, "chmod", "+x", "/usr/local/bin/n"])
+
+        result = run([*sudo, "n", "lts"], check=False)
+        if result.returncode != 0:
+            logger.warning("n lts failed; Node.js may not be installed")
+            return
+
+        logger.info("Node.js LTS installed successfully")
+    finally:
+        if tmp_path:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                logger.warning("Failed to remove temporary n script: %s", tmp_path)
+
+
 def install_quarto() -> None:
     """Install Quarto from GitHub releases."""
     if command_exists("quarto"):

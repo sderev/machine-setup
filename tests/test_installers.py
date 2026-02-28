@@ -34,6 +34,133 @@ class FakeResponse:
         return False
 
 
+# --- Node.js (n) tests ---
+
+
+def test_install_node_skips_when_installed(monkeypatch, caplog) -> None:
+    """Skip Node.js install when node and npm are functional."""
+    monkeypatch.setattr(installers, "command_exists", lambda cmd: cmd in {"node", "npm"})
+    monkeypatch.setattr(
+        installers,
+        "run",
+        lambda cmd, **kwargs: SimpleNamespace(returncode=0, stdout="v"),
+    )
+
+    caplog.set_level("INFO", logger="machine_setup")
+    installers.install_node()
+
+    assert "Node.js and npm already installed" in caplog.text
+
+
+def test_install_node_downloads_n_and_runs_lts(monkeypatch, caplog) -> None:
+    """Happy path: download n, mv, chmod, n lts."""
+    monkeypatch.setattr(installers, "command_exists", lambda _: False)
+    monkeypatch.setattr(installers, "sudo_prefix", lambda: ["sudo"])
+
+    calls: list[list[str]] = []
+
+    def fake_run(cmd, check=True, capture=False, env=None):
+        calls.append(list(cmd))
+        return SimpleNamespace(returncode=0, stdout="")
+
+    monkeypatch.setattr(installers, "run", fake_run)
+
+    removed: list[str] = []
+    monkeypatch.setattr(installers.os, "remove", lambda p: removed.append(p))
+
+    caplog.set_level("INFO", logger="machine_setup")
+    installers.install_node()
+
+    # curl downloads n
+    assert any("curl" in cmd[0] and installers.N_INSTALL_URL in cmd for cmd in calls)
+    # mv to /usr/local/bin/n
+    assert any(cmd[:2] == ["sudo", "mv"] and cmd[-1] == "/usr/local/bin/n" for cmd in calls)
+    # chmod +x
+    assert any("chmod" in cmd for cmd in calls)
+    # n lts
+    assert any(cmd == ["sudo", "n", "lts"] for cmd in calls)
+    assert "Node.js LTS installed successfully" in caplog.text
+    # tmp file was mv'd, so os.remove should not have been called
+    assert not removed
+
+
+def test_install_node_warns_on_download_failure(monkeypatch, caplog) -> None:
+    """Warn and skip when curl fails to download n."""
+    monkeypatch.setattr(installers, "command_exists", lambda _: False)
+
+    def fake_run(cmd, check=True, capture=False, env=None):
+        if cmd[0] == "curl":
+            return SimpleNamespace(returncode=1, stdout="")
+        raise AssertionError(f"Unexpected command: {cmd}")
+
+    monkeypatch.setattr(installers, "run", fake_run)
+
+    removed: list[str] = []
+    real_remove = os.remove
+
+    def fake_remove(path: str) -> None:
+        removed.append(path)
+        real_remove(path)
+
+    monkeypatch.setattr(installers.os, "remove", fake_remove)
+
+    caplog.set_level(logging.WARNING, logger="machine_setup")
+    installers.install_node()
+
+    assert "Failed to download n" in caplog.text
+    # Temp file should be cleaned up
+    assert removed
+
+
+def test_install_node_warns_on_n_lts_failure(monkeypatch, caplog) -> None:
+    """Warn when n lts fails."""
+    monkeypatch.setattr(installers, "command_exists", lambda _: False)
+    monkeypatch.setattr(installers, "sudo_prefix", lambda: [])
+
+    def fake_run(cmd, check=True, capture=False, env=None):
+        if cmd[0] == "curl":
+            return SimpleNamespace(returncode=0, stdout="")
+        if "n" in cmd and "lts" in cmd:
+            return SimpleNamespace(returncode=1, stdout="")
+        return SimpleNamespace(returncode=0, stdout="")
+
+    monkeypatch.setattr(installers, "run", fake_run)
+    monkeypatch.setattr(installers.os, "remove", lambda p: None)
+
+    caplog.set_level(logging.WARNING, logger="machine_setup")
+    installers.install_node()
+
+    assert "n lts failed" in caplog.text
+
+
+def test_install_node_installs_when_node_binary_is_broken(monkeypatch, caplog) -> None:
+    """Install via n when node exists but cannot run."""
+    monkeypatch.setattr(installers, "command_exists", lambda cmd: cmd in {"node", "npm"})
+    monkeypatch.setattr(installers, "sudo_prefix", lambda: [])
+
+    calls: list[list[str]] = []
+
+    def fake_run(cmd, check=True, capture=False, env=None):
+        calls.append(list(cmd))
+        if cmd == ["node", "--version"]:
+            return SimpleNamespace(returncode=127, stdout="")
+        if cmd[0] == "curl":
+            return SimpleNamespace(returncode=0, stdout="")
+        if cmd == ["n", "lts"]:
+            return SimpleNamespace(returncode=0, stdout="")
+        return SimpleNamespace(returncode=0, stdout="")
+
+    monkeypatch.setattr(installers, "run", fake_run)
+    monkeypatch.setattr(installers.os, "remove", lambda p: None)
+
+    caplog.set_level("INFO", logger="machine_setup")
+    installers.install_node()
+
+    assert ["node", "--version"] in calls
+    assert ["n", "lts"] in calls
+    assert "Node.js LTS installed successfully" in caplog.text
+
+
 # --- Quarto tests ---
 
 

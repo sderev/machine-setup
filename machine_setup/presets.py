@@ -50,8 +50,6 @@ PACKAGES_DEV: list[str] = [
     "luarocks",
     "make",
     "net-tools",
-    "nodejs",
-    "npm",
     "openssl",
     "parallel",
     "podman",
@@ -116,7 +114,6 @@ NPM_TOOLS_MINIMAL: list[str] = []
 NPM_TOOLS_DEV: list[str] = [
     "@ccusage/codex",
     "@openai/codex",
-    "n",
     "opencode-ai",
 ]
 

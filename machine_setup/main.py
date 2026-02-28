@@ -17,6 +17,7 @@ from machine_setup.dotfiles import (
 from machine_setup.installers import (
     install_claude_code,
     install_fira_code,
+    install_node,
     install_npm_tools,
     install_packages,
     install_quarto,
@@ -148,6 +149,9 @@ def run_setup(
         if not skip_packages:
             logger.info("=== Installing packages ===")
             install_packages(config)
+            if config.preset in (Preset.DEV, Preset.FULL):
+                logger.info("=== Installing Node.js ===")
+                install_node()
             logger.info("=== Installing uv tools ===")
             install_uv_tools(config.get_uv_tools())
             logger.info("=== Installing npm tools ===")
