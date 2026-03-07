@@ -10,23 +10,28 @@ from machine_setup.utils import command_exists, run
 
 logger = logging.getLogger("machine_setup")
 
-REPOS_SUBDIRS = (
-    "clone",
-    "forks",
-    "sderev",
-)
 
-
-def create_repos_structure(home: Path) -> None:
+def create_repos_structure(home: Path, owner_namespace: str) -> None:
     """Create the user's repos directory structure.
 
     Creates:
         ~/Repos/github.com/clone/
         ~/Repos/github.com/forks/
-        ~/Repos/github.com/sderev/
+        ~/Repos/github.com/<owner_namespace>/
     """
+    if (
+        not owner_namespace
+        or owner_namespace in {".", ".."}
+        or "/" in owner_namespace
+        or "\\" in owner_namespace
+    ):
+        raise RuntimeError(
+            "Invalid private config value for `repos.owner_namespace`: "
+            f"{owner_namespace!r}. Expected a single directory name."
+        )
+
     repos_base = home / "Repos" / "github.com"
-    for subdir in REPOS_SUBDIRS:
+    for subdir in ("clone", "forks", owner_namespace):
         path = repos_base / subdir
         if not path.exists():
             logger.info("Creating directory: %s", path)
@@ -73,11 +78,16 @@ def ensure_github_auth(repo_url: str) -> None:
     run(["gh", "auth", "setup-git"], check=False)
 
 
-def clone_dotfiles(config: SetupConfig) -> Path:
+def clone_dotfiles(
+    *,
+    dotfiles_repo: str,
+    dotfiles_dir: str,
+    dotfiles_branch: str,
+) -> Path:
     """Clone dotfiles repo if not present."""
-    dotfiles_path = Path(config.dotfiles_dir).expanduser()
-    target_branch = config.dotfiles_branch
-    repo_url = config.dotfiles_repo
+    dotfiles_path = Path(dotfiles_dir).expanduser()
+    target_branch = dotfiles_branch
+    repo_url = dotfiles_repo
 
     if dotfiles_path.exists():
         result = run(
@@ -102,8 +112,8 @@ def clone_dotfiles(config: SetupConfig) -> Path:
             logger.warning("Dotfiles repo not updated; `git pull --ff-only` failed.")
         return dotfiles_path
 
-    logger.info("Cloning dotfiles from %s (branch: %s)", config.dotfiles_repo, target_branch)
-    run(["git", "clone", "--branch", target_branch, config.dotfiles_repo, str(dotfiles_path)])
+    logger.info("Cloning dotfiles from %s (branch: %s)", dotfiles_repo, target_branch)
+    run(["git", "clone", "--branch", target_branch, dotfiles_repo, str(dotfiles_path)])
 
     return dotfiles_path
 

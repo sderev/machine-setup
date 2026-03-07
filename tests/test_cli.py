@@ -53,7 +53,16 @@ class TestRunSubcommand:
     def test_invalid_preset(self):
         """Test that invalid preset is rejected."""
         runner = CliRunner()
-        result = runner.invoke(main, ["run", "--preset", "invalid"])
+        result = runner.invoke(
+            main,
+            [
+                "run",
+                "--preset",
+                "invalid",
+                "--dotfiles-repo",
+                "https://github.com/acme/.dotfiles_private.git",
+            ],
+        )
         assert result.exit_code != 0
         assert "Invalid value" in result.output
 
@@ -65,6 +74,8 @@ class TestRunSubcommand:
             "--preset",
             "--dotfiles-repo",
             "--dotfiles-branch",
+            "--apply-wslconfig",
+            "--no-apply-wslconfig",
             "--generate-ssh-key",
             "--generate-gpg-key",
             "--gpg-expiry-days",

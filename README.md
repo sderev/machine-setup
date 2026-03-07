@@ -1,12 +1,59 @@
 # machine-setup
 
-Bootstrap a Debian sid machine with development environment.
+Bootstrap a Debian sid machine with a private, repo-driven development environment.
 
 ## Prerequisites
 
 ```bash
 apt-get install -y git
 ```
+
+## Private Config Required
+
+`machine-setup` requires a private config file from your cloned dotfiles repo:
+
+```text
+<dotfiles-root>/machine-setup/config.toml
+```
+
+Expected schema:
+
+```toml
+[setup]
+timezone = "America/New_York"
+
+[repos]
+owner_namespace = "your-github-namespace"
+
+[presets.minimal]
+packages = []
+uv_tools = []
+npm_tools = []
+stow_packages = []
+
+[presets.dev]
+packages = []
+uv_tools = []
+npm_tools = []
+stow_packages = []
+
+[presets.full]
+packages = []
+uv_tools = []
+npm_tools = []
+stow_packages = []
+
+[wsl]
+apply_wslconfig = false
+```
+
+When this file is missing or invalid, setup fails with an actionable error.
+
+Node.js bootstrap policy:
+
+* Do not add `nodejs` or `npm` to preset `packages`.
+* Do not add `n` to preset `npm_tools`.
+* Node.js is bootstrapped automatically before npm tool installs when `npm_tools` is non-empty.
 
 ## Usage
 
@@ -16,40 +63,52 @@ cd machine-setup
 sudo ./bootstrap.sh [preset] [flags...]
 ```
 
-### Presets
+`bootstrap.sh` can prompt for missing values and persists local answers in:
 
-- `dev` (default): Development tools, no GUI
-- `minimal`: Essential CLI for containers
-- `full`: Full workstation with GUI
+```text
+~/.config/machine-setup/bootstrap.toml
+```
 
-### Flags
+`machine-setup run` also uses this state as fallback for `dotfiles_repo` when `--dotfiles-repo` is omitted.
+
+## Presets
+
+* `dev` (default): Development tools, no GUI
+* `minimal`: Essential CLI for containers
+* `full`: Full workstation with GUI
+
+## Flags
 
 | Flag | Description |
 |------|-------------|
-| `--dotfiles-repo REPO` | GitHub repo for dotfiles (default: sderev/.dotfiles_private) |
-| `--dotfiles-branch BRANCH` | Branch for dotfiles repo (default: main) |
+| `--dotfiles-repo REPO` | Git repo for private dotfiles (required on first run; then optional with persisted state) |
+| `--dotfiles-branch BRANCH` | Branch for dotfiles repo (default: `main`) |
+| `--apply-wslconfig` | Force host `.wslconfig` deployment (WSL) |
+| `--no-apply-wslconfig` | Force skip host `.wslconfig` deployment (WSL) |
 | `--generate-ssh-key` | Generate SSH key and add to GitHub |
 | `--generate-gpg-key EMAIL` | Generate GPG key with this email and add to GitHub |
-| `--gpg-expiry-days N` | GPG key expiry in days (default: 90) |
+| `--gpg-expiry-days N` | GPG key expiry in days (default: `90`) |
 | `--skip-packages` | Skip package installation |
-| `--skip-dotfiles` | Skip dotfiles setup |
+| `--skip-dotfiles` | Skip stowing dotfiles |
 | `--skip-vim` | Skip vim plugin installation |
-| `--skip-windows` | Skip Windows config (WSL only) |
+| `--skip-windows` | Skip Windows app/config setup (WSL only) |
 | `--verbose` | Enable verbose output |
 
-## What it does
+## What It Does
 
 1. Configures apt sources to Debian sid
 2. Runs `apt-get upgrade`
 3. Installs `uv` (Python package manager)
-4. Installs apt packages, `uv` tools, npm tools (per preset)
-5. Installs Fira Code font (dev/full presets; on WSL installs to Windows per-user fonts)
-6. Creates repos directory structure (`~/Repos/github.com/{clone,forks,sderev}/`)
-7. Clones and stows dotfiles from `~/Repos/github.com/sderev/.dotfiles_private`
-8. Generates the `en_US.UTF-8` locale if needed
-9. Sets zsh as default shell; installs vim plugins; creates `ipython-math` environment (dev/full only)
+4. Clones dotfiles early and loads required private `config.toml`
+5. Applies timezone from private config
+6. Installs apt packages, `uv` tools, and npm tools (per preset); when npm tools exist, bootstraps Node.js first
+7. Installs Fira Code font (dev/full presets; on WSL installs to Windows per-user fonts)
+8. Creates repos directory structure (`~/Repos/github.com/{clone,forks,<owner_namespace>}/`)
+9. Stows dotfiles packages from private config
+10. Generates the `en_US.UTF-8` locale if needed
+11. Sets zsh as default shell; installs vim plugins; creates `ipython-math` environment (dev/full)
 
-## Key generation
+## Key Generation
 
 ### SSH key
 
@@ -73,7 +132,7 @@ Generated keys use descriptive names: `machine-setup-{hostname}-{YYYYMMDD}`.
 
 Example: `machine-setup-workstation-20260127`
 
-## Key management
+## Key Management
 
 The `machine-setup keys` commands help manage keys created by this tool on GitHub.
 
@@ -100,27 +159,33 @@ machine-setup keys prune --older-than 30d --yes
 
 ### Key lifecycle
 
-* **SSH keys**: SSH keys do not expire. Use `keys prune` to remove old keys when no longer needed.
-* **GPG keys**: Expire after 90 days by default (configurable via `--gpg-expiry-days`). Regenerate before expiry or use `keys prune` to clean up.
+* SSH keys do not expire. Use `keys prune` to remove old keys when no longer needed.
+* GPG keys expire after 90 days by default (configurable via `--gpg-expiry-days`).
 
-## Windows configuration (WSL only)
+## WSL Configuration Deployment
 
-WSL is auto-detected via `/proc/version` and the `WSL_DISTRO_NAME` environment variable. On native Linux, these steps are a no-op.
+When running in WSL:
 
-When running in WSL, the following are applied automatically:
+* If present in dotfiles, `machine-setup/wsl/wsl.conf` is copied to `/etc/wsl.conf`.
+* If enabled by policy, `machine-setup/wsl/.wslconfig` is copied to `%UserProfile%\.wslconfig`.
+* When `.wslconfig` changes, the tool logs that `wsl --shutdown` is required.
 
-* AutoHotkey keyboard remapping (copied to Windows Startup)
-* Google Chrome (installed via `winget`)
-* Brave (installed via `winget`)
-* Proton Pass (installed via `winget`)
-* VLC (installed via `winget`)
-* Windows Terminal (installed via `winget`)
-* Windows Terminal `settings.json`
-* PowerToys (installed via `winget`)
-* File Pilot (installed via `winget`, config deployed from dotfiles)
-* One-time best-effort taskbar pinning in this order:
-  Chrome, Brave, Windows Terminal, Windows Clock, Calculator
-  (state file: `%LOCALAPPDATA%\\machine-setup\\taskbar-pinning-v1.done`)
-* Fira Code font (installed to the Windows per-user font directory)
+`.wslconfig` deployment policy is resolved as:
 
-Use `--skip-windows` to disable all Windows configuration.
+1. CLI override (`--apply-wslconfig` / `--no-apply-wslconfig`) if provided.
+2. Persisted local consent in `~/.config/machine-setup/bootstrap.toml`.
+3. Private config default (`[wsl].apply_wslconfig`) when no persisted value exists.
+
+The local consent is re-prompted when the source `.wslconfig` content checksum changes.
+If `--skip-windows` is passed, this `.wslconfig` policy flow is bypassed and host
+`.wslconfig` deployment is skipped.
+
+Windows app/config setup currently:
+
+* Installs (via `winget`): AutoHotkey (when startup script exists), Google Chrome, Brave, Proton Pass, VLC, Windows Terminal, PowerToys, File Pilot.
+* Copies dotfiles config when sources exist: startup `remapping.ahk`, Windows Terminal `settings.json`, File Pilot `FPilot-Config.json`.
+* Runs one-time taskbar pinning for Chrome, Brave, Windows Terminal, Windows Clock, and Calculator.
+
+Use `--skip-windows` to skip only this Windows app/config flow. It also bypasses host
+`.wslconfig` policy/deployment, but does not skip WSL distro config deployment to
+`/etc/wsl.conf`.

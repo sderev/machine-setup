@@ -7,6 +7,10 @@ from unittest.mock import Mock, call, patch
 import pytest
 
 from machine_setup.windows import (
+    compute_file_checksum,
+    deploy_wsl_conf,
+    deploy_wslconfig,
+    get_bootstrap_state_path,
     get_filepilot_config,
     get_machine_setup_state_dir,
     get_taskbar_pinning_sentinel,
@@ -14,9 +18,12 @@ from machine_setup.windows import (
     get_windows_startup_folder,
     get_windows_terminal_settings,
     get_windows_username,
+    get_windows_wslconfig_path,
     is_wsl,
+    load_bootstrap_state,
     pin_taskbar_apps,
     pin_taskbar_apps_once,
+    save_bootstrap_state,
     setup_windows_configs,
 )
 
@@ -266,6 +273,143 @@ class TestGetFilePilotConfig:
             "/mnt/c/Users/TestUser/AppData/Roaming/Voidstar/FilePilot/FPilot-Config.json"
         )
         assert result == expected
+
+
+class TestBootstrapState:
+    """Tests for bootstrap state helpers."""
+
+    def test_get_bootstrap_state_path(self, tmp_path):
+        """Bootstrap state path lives under ~/.config/machine-setup."""
+        result = get_bootstrap_state_path(tmp_path)
+        assert result == tmp_path / ".config" / "machine-setup" / "bootstrap.toml"
+
+    def test_save_and_load_bootstrap_state(self, tmp_path):
+        """Bootstrap state persists and reloads expected keys."""
+        state_path = tmp_path / "bootstrap.toml"
+        save_bootstrap_state(
+            {
+                "dotfiles_repo": "https://github.com/acme/.dotfiles_private.git",
+                "dotfiles_branch": "main",
+                "apply_wslconfig": True,
+                "wslconfig_source_checksum": "abc123",
+            },
+            state_path,
+        )
+
+        loaded = load_bootstrap_state(state_path)
+        assert loaded["dotfiles_repo"] == "https://github.com/acme/.dotfiles_private.git"
+        assert loaded["dotfiles_branch"] == "main"
+        assert loaded["apply_wslconfig"] is True
+        assert loaded["wslconfig_source_checksum"] == "abc123"
+
+    def test_save_bootstrap_state_sets_restrictive_permissions(self, tmp_path):
+        """Bootstrap state should be persisted with mode 0600."""
+        state_path = tmp_path / "bootstrap.toml"
+        state_path.write_text('dotfiles_repo = "old"\n')
+        state_path.chmod(0o666)
+
+        save_bootstrap_state(
+            {"dotfiles_repo": "https://github.com/acme/.dotfiles_private.git"}, state_path
+        )
+
+        assert (state_path.stat().st_mode & 0o777) == 0o600
+
+    def test_load_bootstrap_state_invalid_toml(self, tmp_path):
+        """Invalid bootstrap state should be ignored."""
+        state_path = tmp_path / "bootstrap.toml"
+        state_path.write_text("[invalid")
+
+        loaded = load_bootstrap_state(state_path)
+        assert loaded == {}
+
+
+class TestWslConfigDeployment:
+    """Tests for WSL config deployment helpers."""
+
+    def test_get_windows_wslconfig_path(self):
+        """Windows `.wslconfig` path should target user profile root."""
+        result = get_windows_wslconfig_path("TestUser")
+        assert result == Path("/mnt/c/Users/TestUser/.wslconfig")
+
+    def test_compute_file_checksum(self, tmp_path):
+        """Checksum should be stable for identical content."""
+        target = tmp_path / "file.txt"
+        target.write_text("hello")
+
+        first = compute_file_checksum(target)
+        second = compute_file_checksum(target)
+        assert first == second
+
+    def test_deploy_wsl_conf_skips_when_source_missing(self, tmp_path):
+        """Missing source should skip `/etc/wsl.conf` deployment."""
+        dotfiles_path = tmp_path / ".dotfiles_private"
+        dotfiles_path.mkdir()
+
+        assert deploy_wsl_conf(dotfiles_path) is False
+
+    def test_deploy_wsl_conf_uses_sudo_when_needed(self, tmp_path):
+        """Non-root users should deploy `/etc/wsl.conf` via sudo."""
+        dotfiles_path = tmp_path / ".dotfiles_private"
+        source = dotfiles_path / "machine-setup" / "wsl" / "wsl.conf"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("[automount]\n")
+
+        with (
+            patch("machine_setup.windows.os.geteuid", return_value=1000),
+            patch("machine_setup.windows.sudo_prefix", return_value=["sudo"]),
+            patch("machine_setup.windows.run") as mock_run,
+        ):
+            mock_run.return_value = Mock(returncode=0, stderr="")
+            assert deploy_wsl_conf(dotfiles_path) is True
+            assert mock_run.call_args.args[0][:3] == ["sudo", "install", "-m"]
+
+    def test_deploy_wsl_conf_enforces_mode_for_root_copy(self, tmp_path):
+        """Root deployments should set `/etc/wsl.conf` permissions to 0644."""
+        dotfiles_path = tmp_path / ".dotfiles_private"
+        source = dotfiles_path / "machine-setup" / "wsl" / "wsl.conf"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("[automount]\n")
+
+        target = Mock(spec=Path)
+        target.exists.return_value = False
+
+        with (
+            patch("machine_setup.windows.os.geteuid", return_value=0),
+            patch("machine_setup.windows.Path", return_value=target),
+            patch("machine_setup.windows.shutil.copy2") as mock_copy,
+        ):
+            assert deploy_wsl_conf(dotfiles_path) is True
+            mock_copy.assert_called_once_with(source, target)
+            target.chmod.assert_called_once_with(0o644)
+
+    def test_deploy_wslconfig_reports_change(self, tmp_path):
+        """Deploying changed host config should return True."""
+        dotfiles_path = tmp_path / ".dotfiles_private"
+        source = dotfiles_path / "machine-setup" / "wsl" / ".wslconfig"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("[wsl2]\nmemory=8GB\n")
+
+        target = tmp_path / "Users" / "TestUser" / ".wslconfig"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("[wsl2]\nmemory=4GB\n")
+
+        with patch("machine_setup.windows.get_windows_wslconfig_path", return_value=target):
+            assert deploy_wslconfig(dotfiles_path, "TestUser") is True
+            assert target.read_text() == "[wsl2]\nmemory=8GB\n"
+
+    def test_deploy_wslconfig_reports_no_change(self, tmp_path):
+        """Deploying identical host config should return False."""
+        dotfiles_path = tmp_path / ".dotfiles_private"
+        source = dotfiles_path / "machine-setup" / "wsl" / ".wslconfig"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text("[wsl2]\nmemory=8GB\n")
+
+        target = tmp_path / "Users" / "TestUser" / ".wslconfig"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("[wsl2]\nmemory=8GB\n")
+
+        with patch("machine_setup.windows.get_windows_wslconfig_path", return_value=target):
+            assert deploy_wslconfig(dotfiles_path, "TestUser") is False
 
 
 class TestTaskbarPinning:
