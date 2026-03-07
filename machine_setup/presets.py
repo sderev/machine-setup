@@ -102,6 +102,7 @@ UV_TOOLS_DEV: list[str] = [
     "lmtoolbox",
     "ruff",
     "toc-markdown",
+    "git+https://github.com/sderev/todo",
     "ty",
     "vocabmaster",
     "wslshot",
