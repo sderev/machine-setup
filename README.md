@@ -33,7 +33,7 @@ stow_packages = []
 
 [presets.dev]
 packages = []
-uv_tools = []
+uv_tools = ["git+https://github.com/sderev/todo"]
 npm_tools = []
 stow_packages = []
 
