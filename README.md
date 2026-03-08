@@ -116,6 +116,7 @@ When running in WSL, the following are applied automatically:
 * VLC (installed via `winget`)
 * Windows Terminal (installed via `winget`)
 * Windows Terminal `settings.json`
+* Windows PowerShell `Microsoft.PowerShell_profile.ps1` copied under the current Windows Documents folder
 * PowerToys (installed via `winget`)
 * File Pilot (installed via `winget`, config deployed from dotfiles)
 * One-time best-effort taskbar pinning in this order:

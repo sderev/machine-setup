@@ -10,7 +10,9 @@ from machine_setup.windows import (
     get_filepilot_config,
     get_machine_setup_state_dir,
     get_taskbar_pinning_sentinel,
+    get_windows_documents_dir,
     get_windows_fonts_dir,
+    get_windows_powershell_profile,
     get_windows_startup_folder,
     get_windows_terminal_settings,
     get_windows_username,
@@ -243,6 +245,70 @@ class TestGetWindowsFontsDir:
         assert result == expected
 
 
+class TestGetWindowsDocumentsDir:
+    """Tests for get_windows_documents_dir function."""
+
+    def test_returns_documents_dir_from_powershell(self):
+        """Resolved Documents path is converted to a WSL path."""
+        powershell_result = Mock(returncode=0, stdout="C:\\Users\\TestUser\\OneDrive\\Documents\n")
+        wslpath_result = Mock(returncode=0, stdout="/mnt/c/Users/TestUser/OneDrive/Documents\n")
+
+        with patch(
+            "machine_setup.windows.run",
+            side_effect=[powershell_result, wslpath_result],
+        ) as mock_run:
+            result = get_windows_documents_dir()
+
+        assert result == Path("/mnt/c/Users/TestUser/OneDrive/Documents")
+        assert mock_run.call_args_list[0] == call(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-Command",
+                "[System.Environment]::GetFolderPath('MyDocuments')",
+            ],
+            check=False,
+            capture=True,
+        )
+        assert mock_run.call_args_list[1] == call(
+            ["wslpath", "-u", "C:\\Users\\TestUser\\OneDrive\\Documents"],
+            check=False,
+            capture=True,
+        )
+
+    def test_returns_none_when_powershell_fails(self):
+        """PowerShell resolution failures are tolerated."""
+        powershell_result = Mock(returncode=1, stdout="")
+
+        with patch("machine_setup.windows.run", return_value=powershell_result):
+            assert get_windows_documents_dir() is None
+
+
+class TestGetWindowsPowerShellProfile:
+    """Tests for get_windows_powershell_profile function."""
+
+    def test_uses_resolved_documents_dir(self):
+        """Profile path follows the current Documents location."""
+        documents_dir = Path("/mnt/c/Users/TestUser/OneDrive/Documents")
+
+        with patch("machine_setup.windows.get_windows_documents_dir", return_value=documents_dir):
+            result = get_windows_powershell_profile("TestUser")
+
+        assert result == Path(
+            "/mnt/c/Users/TestUser/OneDrive/Documents/WindowsPowerShell/"
+            "Microsoft.PowerShell_profile.ps1"
+        )
+
+    def test_falls_back_to_user_documents_dir(self):
+        """Fallback path keeps setup working without dynamic resolution."""
+        with patch("machine_setup.windows.get_windows_documents_dir", return_value=None):
+            result = get_windows_powershell_profile("TestUser")
+
+        assert result == Path(
+            "/mnt/c/Users/TestUser/Documents/WindowsPowerShell/Microsoft.PowerShell_profile.ps1"
+        )
+
+
 class TestGetWindowsTerminalSettings:
     """Tests for get_windows_terminal_settings function."""
 
@@ -471,6 +537,35 @@ class TestSetupWindowsConfigs:
 
             assert wt_dst.exists()
             assert "Installed Windows Terminal settings" in caplog.text
+
+    def test_installs_windows_powershell_profile(self, tmp_path, caplog):
+        """Windows PowerShell profile is copied to the resolved Documents folder."""
+        import logging
+
+        caplog.set_level(logging.INFO)
+
+        dotfiles = tmp_path / "dotfiles"
+        dotfiles.mkdir()
+        ps_dir = dotfiles / "windows" / "powershell"
+        ps_dir.mkdir(parents=True)
+        ps_src = ps_dir / "Microsoft.PowerShell_profile.ps1"
+        ps_src.write_text("Set-PSReadLineOption -EditMode Vi\n")
+
+        ps_dst_dir = tmp_path / "WindowsPowerShell"
+        ps_dst_dir.mkdir()
+        ps_dst = ps_dst_dir / "Microsoft.PowerShell_profile.ps1"
+
+        with (
+            patch("machine_setup.windows.is_wsl", return_value=True),
+            patch("machine_setup.windows.get_windows_username", return_value="TestUser"),
+            patch("machine_setup.windows.get_windows_powershell_profile", return_value=ps_dst),
+            patch("machine_setup.windows.install_winget_package", return_value=True),
+        ):
+            setup_windows_configs(dotfiles)
+
+            assert ps_dst.exists()
+            assert ps_dst.read_text() == "Set-PSReadLineOption -EditMode Vi\n"
+            assert "Installed Windows PowerShell profile" in caplog.text
 
     def test_installs_expected_winget_packages(self, tmp_path):
         """Requested app package IDs are installed via winget."""

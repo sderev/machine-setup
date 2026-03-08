@@ -166,6 +166,81 @@ def get_windows_fonts_dir(username: str) -> Path:
     return Path(f"/mnt/c/Users/{username}/AppData/Local/Microsoft/Windows/Fonts")
 
 
+def get_windows_documents_dir() -> Path | None:
+    """Get the current Windows Documents directory as a WSL path."""
+    try:
+        documents_result = run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-Command",
+                "[System.Environment]::GetFolderPath('MyDocuments')",
+            ],
+            check=False,
+            capture=True,
+        )
+    except FileNotFoundError as error:
+        logger.warning(
+            "Could not resolve Windows Documents directory; powershell.exe not available: %s",
+            error,
+        )
+        return None
+
+    if documents_result.returncode != 0:
+        logger.warning(
+            "Could not resolve Windows Documents directory; powershell.exe exited with %s",
+            documents_result.returncode,
+        )
+        return None
+
+    windows_documents = documents_result.stdout.strip()
+    if not windows_documents:
+        logger.warning(
+            "Could not resolve Windows Documents directory; powershell.exe returned an empty path"
+        )
+        return None
+
+    try:
+        wslpath_result = run(["wslpath", "-u", windows_documents], check=False, capture=True)
+    except FileNotFoundError as error:
+        logger.warning(
+            "Could not convert Windows Documents path to WSL path; wslpath not available: %s",
+            error,
+        )
+        return None
+
+    if wslpath_result.returncode != 0:
+        logger.warning(
+            "Could not convert Windows Documents path to WSL path; wslpath exited with %s",
+            wslpath_result.returncode,
+        )
+        return None
+
+    documents_path = wslpath_result.stdout.strip()
+    if not documents_path:
+        logger.warning(
+            "Could not convert Windows Documents path to WSL path; wslpath returned an empty path"
+        )
+        return None
+
+    return Path(documents_path)
+
+
+def get_windows_powershell_profile(username: str) -> Path | None:
+    """Get Windows PowerShell current-user current-host profile path."""
+    documents_dir = get_windows_documents_dir()
+    if documents_dir is not None:
+        return documents_dir / "WindowsPowerShell" / "Microsoft.PowerShell_profile.ps1"
+
+    logger.warning(
+        "Falling back to username-based Windows PowerShell profile path; "
+        "Documents redirection may be missed"
+    )
+    return Path(
+        f"/mnt/c/Users/{username}/Documents/WindowsPowerShell/Microsoft.PowerShell_profile.ps1"
+    )
+
+
 def get_windows_terminal_settings(username: str) -> Path:
     """Get Windows Terminal settings.json path."""
     return Path(
@@ -330,6 +405,14 @@ def setup_windows_configs(dotfiles_path: Path) -> None:
             logger.info("Installed Windows Terminal settings")
         else:
             logger.debug("Windows Terminal not installed, skipping settings copy")
+
+    ps_src = dotfiles_path / "windows" / "powershell" / "Microsoft.PowerShell_profile.ps1"
+    if ps_src.exists():
+        ps_dst = get_windows_powershell_profile(username)
+        if ps_dst is not None:
+            ps_dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ps_src, ps_dst)
+            logger.info("Installed Windows PowerShell profile")
 
     # Install PowerToys
     logger.info("Installing PowerToys via winget...")
