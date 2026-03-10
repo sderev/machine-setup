@@ -431,10 +431,8 @@ def setup_windows_configs(dotfiles_path: Path) -> None:
     fp_src = dotfiles_path / "windows" / "filepilot" / "FPilot-Config.json"
     if fp_src.exists():
         fp_dst = get_filepilot_config(username)
-        if fp_dst.parent.exists():
-            shutil.copy2(fp_src, fp_dst)
-            logger.info("Installed File Pilot config")
-        else:
-            logger.debug("File Pilot not installed, skipping config copy")
+        fp_dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(fp_src, fp_dst)
+        logger.info("Installed File Pilot config to %s", fp_dst)
 
     pin_taskbar_apps_once(username)

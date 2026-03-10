@@ -722,7 +722,7 @@ class TestSetupWindowsConfigs:
             assert "Failed to install File Pilot via winget" in caplog.text
 
     def test_installs_filepilot_config(self, tmp_path, caplog):
-        """Test File Pilot config is copied when source and dest dir exist."""
+        """Test File Pilot config is copied to the configured path."""
         import logging
 
         caplog.set_level(logging.INFO)
@@ -748,13 +748,13 @@ class TestSetupWindowsConfigs:
 
             assert fp_dst.exists()
             assert fp_dst.read_text() == '{"theme": "dark"}'
-            assert "Installed File Pilot config" in caplog.text
+            assert f"Installed File Pilot config to {fp_dst}" in caplog.text
 
-    def test_skips_filepilot_config_when_dir_missing(self, tmp_path, caplog):
-        """Test File Pilot config is skipped when dest dir does not exist."""
+    def test_creates_filepilot_config_dir_when_missing(self, tmp_path, caplog):
+        """Test File Pilot config copy creates the destination directory."""
         import logging
 
-        caplog.set_level(logging.DEBUG)
+        caplog.set_level(logging.INFO)
 
         dotfiles = tmp_path / "dotfiles"
         dotfiles.mkdir()
@@ -763,7 +763,7 @@ class TestSetupWindowsConfigs:
         fp_src = fp_dir / "FPilot-Config.json"
         fp_src.write_text('{"theme": "dark"}')
 
-        fp_dst = tmp_path / "nonexistent" / "FPilot-Config.json"
+        fp_dst = tmp_path / "nonexistent" / "FilePilot" / "FPilot-Config.json"
 
         with (
             patch("machine_setup.windows.is_wsl", return_value=True),
@@ -773,5 +773,6 @@ class TestSetupWindowsConfigs:
         ):
             setup_windows_configs(dotfiles)
 
-            assert not fp_dst.exists()
-            assert "File Pilot not installed, skipping config copy" in caplog.text
+            assert fp_dst.exists()
+            assert fp_dst.read_text() == '{"theme": "dark"}'
+            assert f"Installed File Pilot config to {fp_dst}" in caplog.text

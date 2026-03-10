@@ -118,7 +118,7 @@ When running in WSL, the following are applied automatically:
 * Windows Terminal `settings.json`
 * Windows PowerShell `Microsoft.PowerShell_profile.ps1` copied under the current Windows Documents folder
 * PowerToys (installed via `winget`)
-* File Pilot (installed via `winget`, config deployed from dotfiles)
+* File Pilot (installed via `winget`, config deployed from dotfiles to `%APPDATA%\\Voidstar\\FilePilot\\FPilot-Config.json`)
 * One-time best-effort taskbar pinning in this order:
   Chrome, Brave, Windows Terminal, Windows Clock, Calculator
   (state file: `%LOCALAPPDATA%\\machine-setup\\taskbar-pinning-v1.done`)
