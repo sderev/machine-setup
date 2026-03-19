@@ -56,6 +56,7 @@ PACKAGES_DEV: list[str] = [
     "python-is-python3",
     "python3",
     "ipython3",
+    "ldap-utils",
     "rlwrap",
     "rsync",
     "rustc",
